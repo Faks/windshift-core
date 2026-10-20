@@ -25,6 +25,16 @@ steps:
       - git clone --depth 1 -b feature/events-idle-statement-budget https://github.com/Faks/windshift-core-tests.git /tmp/core-tests
       - bash /tmp/core-tests/overlay.sh . -- -tags=test -count=1 ./internal/events/...
 
+  # ./internal/... only: main.go embeds all:frontend/dist, which is not built in
+  # the CI container. Upstream's make lint covers the whole repo after the
+  # frontend build. Version pinned to Makefile's GOLANGCI_LINT_VERSION.
+  - name: lint
+    image: golang:1.27.2-alpine
+    commands:
+      - apk add --no-cache bash
+      - GOTOOLCHAIN=local go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
+      - golangci-lint run --timeout=5m ./internal/...
+
   - name: architecture-guards
     image: alpine:3.22
     commands:
