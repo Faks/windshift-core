@@ -527,7 +527,7 @@ func (e *Engine) retryDelay(attempt int) time.Duration {
 // eligibleHandlerKeys returns the consumers the last gate reported as having an
 // eligible delivery, limited to consumers with a registered handler, in rotated
 // order so a busy consumer cannot starve the others. Rotation is unchanged from
-// the previous per-tick behaviour.
+// the previous per-tick behavior.
 func (e *Engine) eligibleHandlerKeys() []string {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -539,19 +539,6 @@ func (e *Engine) eligibleHandlerKeys() []string {
 	}
 	slices.Sort(keys)
 	return rotateKeys(keys, &e.nextHandler)
-}
-
-// registeredKeys lists handlers in stable order, so the reconciler can decide
-// per consumer without a database read.
-func (e *Engine) registeredKeys() []string {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	keys := make([]string, 0, len(e.handlers))
-	for key := range e.handlers {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-	return keys
 }
 
 func (e *Engine) setWorkKeys(scan, claim []string) {
