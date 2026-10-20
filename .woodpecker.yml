@@ -1,0 +1,34 @@
+# Fork pipeline: Woodpecker only, no GitHub Actions runners.
+# Upstream CI never runs go test, so the test gate lives here. Test sources are
+# not in this repo: the core .gitignore excludes them and they live in the
+# adjacent core-tests repo, overlaid onto a core checkout by overlay.sh.
+# go build ./... is not run because main.go embeds all:frontend/dist.
+# No volumes and no privileged steps: the repo trust level does not allow them.
+# core-tests is cloned from the public GitHub fork, because this Forgejo instance
+# does not allow minting an API token, so there is no credential to give CI for a
+# private clone.
+
+when:
+  - event: [push, pull_request, manual]
+
+steps:
+  - name: probe-runner
+    image: alpine:3.22
+    commands:
+      - echo "runner host = $$(hostname)"
+      - test -S /var/run/docker.sock && echo "docker socket mounted" || echo "docker socket absent"
+
+  - name: test
+    image: golang:1.27.2-alpine
+    commands:
+      - apk add --no-cache bash git coreutils
+      - git clone --depth 1 https://github.com/Faks/windshift-core-tests.git /tmp/core-tests
+      - bash /tmp/core-tests/overlay.sh . -- -tags=test -count=1 ./internal/events/...
+
+  - name: architecture-guards
+    image: alpine:3.22
+    commands:
+      - apk add --no-cache bash git nodejs
+      - bash scripts/check-layering.sh
+      - bash scripts/check-handler-db-access.sh
+      - node scripts/check-sql-boolean-literals.mjs
