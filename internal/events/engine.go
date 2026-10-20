@@ -303,19 +303,30 @@ func (e *Engine) reconcileLoop(ctx context.Context) {
 // has not covered every event, so its cursor must not jump to the gate's
 // highest id.
 func (e *Engine) tick(ctx context.Context) (int64, error) {
-	registered := e.registeredKeys()
-	gate, err := e.store.Gate(ctx, e.lowestCursor(registered), e.now())
+	gate, err := e.store.Gate(ctx, e.lowestCursor(), e.now())
 	if err != nil {
 		return 0, err
+	}
+
+	// Scanning still covers every active consumer, as before, not only consumers
+	// with a handler in this process: deliveries for a handler registered later
+	// must still exist. The gate names the active set whenever any event is past
+	// the lowest cursor, so the only case the gate cannot name is a late-committed
+	// event whose id is below every cursor — which is what the periodic full scan
+	// is for. On a full scan the consumers the engine already knows are scanned too.
+	targets := gate.ScanKeys
+	full := e.fullReconcileDue()
+	if full {
+		targets = unionKeys(targets, e.knownKeys())
+	}
+	if len(gate.ScanKeys) > 0 {
+		// A named consumer means EXISTS was true, so ScanKeys is the full active
+		// set and cursors of consumers no longer active can be dropped.
+		e.pruneCursors(gate.ScanKeys)
 	}
 	e.setWorkKeys(gate.ScanKeys, gate.ClaimKeys)
 
 	var total int64
-	full := e.fullReconcileDue()
-	targets := intersectKeys(registered, gate.ScanKeys)
-	if full {
-		targets = registered
-	}
 	for _, key := range targets {
 		afterID := e.reconcileCursors[key]
 		if full {
@@ -342,28 +353,50 @@ func (e *Engine) tick(ctx context.Context) (int64, error) {
 	return total, nil
 }
 
-// lowestCursor is the oldest uncovered point across consumers. If no event is
-// past it, no consumer can have new work, and the reconciler scans nothing.
-func (e *Engine) lowestCursor(keys []string) int64 {
+// lowestCursor is the oldest uncovered point across the consumers the engine
+// knows. If no event is past it, no consumer can have new work, and nothing is
+// scanned.
+func (e *Engine) lowestCursor() int64 {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	lowest := int64(0)
-	for i, key := range keys {
-		cursor := e.reconcileCursors[key]
-		if i == 0 || cursor < lowest {
+	for _, cursor := range e.reconcileCursors {
+		if cursor < lowest {
 			lowest = cursor
 		}
 	}
 	return lowest
 }
 
-func intersectKeys(registered, gate []string) []string {
-	out := make([]string, 0, len(gate))
-	for _, key := range gate {
-		if slices.Contains(registered, key) {
+func (e *Engine) knownKeys() []string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	keys := make([]string, 0, len(e.reconcileCursors))
+	for key := range e.reconcileCursors {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	return keys
+}
+
+func (e *Engine) pruneCursors(active []string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for key := range e.reconcileCursors {
+		if !slices.Contains(active, key) {
+			delete(e.reconcileCursors, key)
+		}
+	}
+}
+
+func unionKeys(a, b []string) []string {
+	out := slices.Clone(a)
+	for _, key := range b {
+		if !slices.Contains(out, key) {
 			out = append(out, key)
 		}
 	}
+	slices.Sort(out)
 	return out
 }
 
