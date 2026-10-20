@@ -373,7 +373,7 @@ func (s *Store) Reconcile(ctx context.Context, limit int) (int64, error) {
 		if remaining <= 0 {
 			break
 		}
-		created, _, err := s.reconcileConsumer(ctx, key, 0, remaining)
+		created, err := s.reconcileConsumer(ctx, key, 0, remaining)
 		if err != nil {
 			return total, err
 		}
@@ -408,18 +408,82 @@ func (s *Store) ActiveConsumerKeys(ctx context.Context) ([]string, error) {
 	return keys, nil
 }
 
-// reconcileConsumer creates pending deliveries for one active consumer for
-// events with an id greater than afterID. It returns the number of created
-// deliveries and the highest event id visible once the scan finished, which
-// callers may store as the next afterID only after a short (exhaustive) scan.
-func (s *Store) reconcileConsumer(
-	ctx context.Context,
-	consumerKey string,
-	afterID, limit int64,
-) (created, maxSeen int64, err error) {
-	if limit <= 0 {
-		return 0, 0, errors.New("reconcile limit must be positive")
+// GateResult is the answer of the once-per-tick gate statement.
+type GateResult struct {
+	// ScanKeys are active consumers that may have events past the lowest cursor
+	// the engine holds. Consumers the gate does not name cannot have new work.
+	ScanKeys []string
+	// ClaimKeys are consumers with a delivery already eligible for claim.
+	ClaimKeys []string
+	// MaxEventID is the highest event id the reconciler can see. A consumer
+	// whose cursor already equals it is covered and is not scanned again.
+	MaxEventID int64
+}
+
+// gateSQL is the once-per-tick statement. It is dialect-neutral: no array
+// parameters, no locking clause, plain ? placeholders.
+const gateSQL = `
+	SELECT 1 AS gate_kind, CAST(NULL AS TEXT) AS consumer_key, CAST(COALESCE(MAX(id), 0) AS INTEGER) AS event_id
+	FROM domain_events
+	UNION ALL
+	SELECT 2, consumer.consumer_key, CAST(NULL AS INTEGER)
+	FROM domain_event_consumers consumer
+	WHERE consumer.is_active = true
+	  AND EXISTS (SELECT 1 FROM domain_events event WHERE event.id > ?)
+	UNION ALL
+	SELECT 3, delivery.consumer_key, CAST(NULL AS INTEGER)
+	FROM domain_event_deliveries delivery
+	JOIN domain_event_consumers consumer ON consumer.consumer_key = delivery.consumer_key
+	WHERE consumer.is_active = true
+	  AND (
+		(delivery.state IN ('pending', 'retry') AND delivery.next_attempt_at <= ?)
+		OR (delivery.state = 'leased' AND delivery.lease_expires_at <= ?)
+	  )
+	GROUP BY delivery.consumer_key
+`
+
+// Gate answers which consumers have work in one statement. Before this, an
+// idle engine probed every consumer and opened a transaction per probe, so an
+// empty queue still cost a statement per consumer per tick, plus one read per
+// consumer for MAX(id). The gate names only consumers that can have work: an
+// idle or inactive consumer is named by nothing, so the loop skips it. Claim
+// stays inside a transaction whenever a claim happens.
+func (s *Store) Gate(ctx context.Context, minCursor int64, now time.Time) (GateResult, error) {
+	var result GateResult
+	rows, err := s.db.QueryContext(ctx, gateSQL, minCursor, now.UTC(), now.UTC())
+	if err != nil {
+		return result, fmt.Errorf("gate domain event work: %w", err)
 	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var kind int
+		var consumerKey sql.NullString
+		var eventID sql.NullInt64
+		if err := rows.Scan(&kind, &consumerKey, &eventID); err != nil {
+			return result, fmt.Errorf("scan domain event gate row: %w", err)
+		}
+		switch kind {
+		case 1:
+			result.MaxEventID = eventID.Int64
+		case 2:
+			result.ScanKeys = append(result.ScanKeys, consumerKey.String)
+		default:
+			result.ClaimKeys = append(result.ClaimKeys, consumerKey.String)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return result, fmt.Errorf("iterate domain event gate rows: %w", err)
+	}
+	slices.Sort(result.ScanKeys)
+	slices.Sort(result.ClaimKeys)
+	return result, nil
+}
+
+// reconcileQuery builds the delivery-creating statement for one dialect. The
+// SQLite branch must stay: SQLite needs INSERT OR IGNORE rather than
+// ON CONFLICT DO NOTHING. Placeholders are plain ?, rewritten by the database
+// layer for PostgreSQL, so nothing here hardcodes $n.
+func reconcileQuery(driver string) string {
 	query := `
 		INSERT INTO domain_event_deliveries (
 			event_id, consumer_key, state, next_attempt_at, created_at, updated_at
@@ -451,48 +515,41 @@ func (s *Store) reconcileConsumer(
 		ORDER BY e.id
 		LIMIT ?
 	`
-	if s.db.GetDriverName() == "sqlite" {
-		query = strings.Replace(query, "INSERT INTO domain_event_deliveries", "INSERT OR IGNORE INTO domain_event_deliveries", 1)
-	} else {
-		query += " ON CONFLICT (event_id, consumer_key) DO NOTHING"
+	if driver == "sqlite" {
+		return strings.Replace(query, "INSERT INTO domain_event_deliveries", "INSERT OR IGNORE INTO domain_event_deliveries", 1)
 	}
-	result, err := s.db.ExecWriteContext(ctx, query, afterID, consumerKey, limit)
-	if err != nil {
-		return 0, 0, fmt.Errorf("reconcile domain event deliveries for %q: %w", consumerKey, err)
-	}
-	created, err = result.RowsAffected()
-	if err != nil {
-		return 0, 0, fmt.Errorf("read reconciled delivery count for %q: %w", consumerKey, err)
-	}
-	if err := s.db.QueryRowContext(ctx, `
-		SELECT COALESCE(MAX(id), 0) FROM domain_events
-	`).Scan(&maxSeen); err != nil {
-		return 0, 0, fmt.Errorf("read max domain event id for %q reconcile: %w", consumerKey, err)
-	}
-	return created, maxSeen, nil
+	return query + " ON CONFLICT (event_id, consumer_key) DO NOTHING"
 }
 
-// Claim leases the next causally eligible delivery for one consumer.
-func (s *Store) Claim(
+// reconcileConsumer creates pending deliveries for one active consumer for
+// events with an id greater than afterID. It returns the number of created
+// deliveries. The caller advances the cursor from the gate's highest visible
+// event id, so this statement no longer needs a second MAX(id) read per
+// consumer per tick.
+func (s *Store) reconcileConsumer(
 	ctx context.Context,
 	consumerKey string,
-	owner string,
-	now time.Time,
-	leaseDuration time.Duration,
-) (*Delivery, error) {
-	if strings.TrimSpace(consumerKey) == "" || strings.TrimSpace(owner) == "" {
-		return nil, errors.New("consumer key and lease owner are required")
+	afterID, limit int64,
+) (int64, error) {
+	if limit <= 0 {
+		return 0, errors.New("reconcile limit must be positive")
 	}
-	if leaseDuration <= 0 {
-		return nil, errors.New("lease duration must be positive")
-	}
-
-	tx, err := s.db.BeginTx(ctx, nil)
+	query := reconcileQuery(s.db.GetDriverName())
+	result, err := s.db.ExecWriteContext(ctx, query, afterID, consumerKey, limit)
 	if err != nil {
-		return nil, fmt.Errorf("begin domain event claim: %w", err)
+		return 0, fmt.Errorf("reconcile domain event deliveries for %q: %w", consumerKey, err)
 	}
-	defer func() { _ = tx.Rollback() }()
+	created, err := result.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("read reconciled delivery count for %q: %w", consumerKey, err)
+	}
+	return created, nil
+}
 
+// claimQuery builds the claim SELECT for one dialect. FOR UPDATE OF delivery
+// SKIP LOCKED is PostgreSQL-only; SQLite has no locking clause, so this branch
+// must stay. The claim still runs inside a transaction in both dialects.
+func claimQuery(driver string) string {
 	query := `
 		SELECT delivery.event_id, delivery.attempt_count
 		FROM domain_event_deliveries delivery
@@ -518,9 +575,34 @@ func (s *Store) Claim(
 		ORDER BY delivery.next_attempt_at, event.id
 		LIMIT 1
 	`
-	if s.db.GetDriverName() == "postgres" {
-		query += " FOR UPDATE OF delivery SKIP LOCKED"
+	if driver == "postgres" {
+		return query + " FOR UPDATE OF delivery SKIP LOCKED"
 	}
+	return query
+}
+
+// Claim leases the next causally eligible delivery for one consumer.
+func (s *Store) Claim(
+	ctx context.Context,
+	consumerKey string,
+	owner string,
+	now time.Time,
+	leaseDuration time.Duration,
+) (*Delivery, error) {
+	if strings.TrimSpace(consumerKey) == "" || strings.TrimSpace(owner) == "" {
+		return nil, errors.New("consumer key and lease owner are required")
+	}
+	if leaseDuration <= 0 {
+		return nil, errors.New("lease duration must be positive")
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin domain event claim: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	query := claimQuery(s.db.GetDriverName())
 
 	var eventID int64
 	var previousAttempts int

@@ -109,6 +109,12 @@ type Engine struct {
 	reconcileCursors  map[string]int64
 	lastFullReconcile time.Time
 
+	// workKeys is the consumer set the last gate reported as having eligible
+	// deliveries, plus any consumer the same tick created deliveries for. It is
+	// guarded by mu and read by workers, so an idle engine claims nothing at
+	// all instead of probing every consumer once per tick.
+	workKeys []string
+
 	now    func() time.Time
 	jitter func(time.Duration) time.Duration
 	// leaseRenewed is a test observation hook set before engine startup.
@@ -275,7 +281,7 @@ func (e *Engine) reconcileLoop(ctx context.Context) {
 	ticker := time.NewTicker(e.config.PollInterval)
 	defer ticker.Stop()
 	for {
-		if _, err := e.reconcile(ctx); err != nil && ctx.Err() == nil {
+		if _, err := e.tick(ctx); err != nil && ctx.Err() == nil {
 			slog.Error("domain event reconciliation failed", "error", err)
 		}
 		select {
@@ -287,43 +293,78 @@ func (e *Engine) reconcileLoop(ctx context.Context) {
 	}
 }
 
-// reconcile creates missing deliveries. Per consumer it normally scans only
-// events past the in-memory cursor; a full history scan runs periodically to
-// bound the delay of events whose inserting transaction was still in flight
-// when a cursor advanced past their (lower) id.
-func (e *Engine) reconcile(ctx context.Context) (int64, error) {
-	keys, err := e.store.ActiveConsumerKeys(ctx)
+// tick pays one gate statement per tick, then only does the work that gate
+// proved exists: it creates deliveries for consumers whose cursor does not yet
+// cover the highest visible event id, and records the consumers with eligible
+// deliveries so workers claim for those only. An idle engine costs one
+// statement per tick instead of one per consumer plus a transaction per claim.
+//
+// Cursors advance only after an exhaustive scan, as before: a batch-sized scan
+// has not covered every event, so its cursor must not jump to the gate's
+// highest id.
+func (e *Engine) tick(ctx context.Context) (int64, error) {
+	registered := e.registeredKeys()
+	gate, err := e.store.Gate(ctx, e.lowestCursor(registered), e.now())
 	if err != nil {
 		return 0, err
 	}
-	for key := range e.reconcileCursors {
-		if !slices.Contains(keys, key) {
-			delete(e.reconcileCursors, key)
-		}
-	}
-	full := e.fullReconcileDue()
+	e.setWorkKeys(gate.ScanKeys, gate.ClaimKeys)
+
 	var total int64
-	for _, key := range keys {
+	full := e.fullReconcileDue()
+	targets := intersectKeys(registered, gate.ScanKeys)
+	if full {
+		targets = registered
+	}
+	for _, key := range targets {
 		afterID := e.reconcileCursors[key]
 		if full {
 			afterID = 0
+		} else if afterID >= gate.MaxEventID {
+			continue
 		}
 		for {
-			created, maxSeen, err := e.store.reconcileConsumer(ctx, key, afterID, int64(e.config.ReconcileBatch))
+			created, err := e.store.reconcileConsumer(ctx, key, afterID, int64(e.config.ReconcileBatch))
 			if err != nil {
 				return total, err
 			}
 			total += created
 			if created > 0 {
+				e.addWorkKey(key)
 				e.signalWorkers()
 			}
 			if created < int64(e.config.ReconcileBatch) {
-				e.reconcileCursors[key] = maxSeen
+				e.reconcileCursors[key] = gate.MaxEventID
 				break
 			}
 		}
 	}
 	return total, nil
+}
+
+// lowestCursor is the oldest uncovered point across consumers. If no event is
+// past it, no consumer can have new work, and the reconciler scans nothing.
+func (e *Engine) lowestCursor(keys []string) int64 {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	lowest := int64(0)
+	for i, key := range keys {
+		cursor := e.reconcileCursors[key]
+		if i == 0 || cursor < lowest {
+			lowest = cursor
+		}
+	}
+	return lowest
+}
+
+func intersectKeys(registered, gate []string) []string {
+	out := make([]string, 0, len(gate))
+	for _, key := range gate {
+		if slices.Contains(registered, key) {
+			out = append(out, key)
+		}
+	}
+	return out
 }
 
 func (e *Engine) fullReconcileDue() bool {
@@ -356,7 +397,7 @@ func (e *Engine) workerLoop(ctx context.Context) {
 }
 
 func (e *Engine) processOne(ctx context.Context) (bool, error) {
-	keys := e.handlerKeys()
+	keys := e.eligibleHandlerKeys()
 	for _, consumerKey := range keys {
 		delivery, err := e.store.Claim(ctx, consumerKey, e.owner, e.now(), e.config.LeaseDuration)
 		if err != nil {
@@ -450,7 +491,26 @@ func (e *Engine) retryDelay(attempt int) time.Duration {
 	return delay + jitter
 }
 
-func (e *Engine) handlerKeys() []string {
+// eligibleHandlerKeys returns the consumers the last gate reported as having an
+// eligible delivery, limited to consumers with a registered handler, in rotated
+// order so a busy consumer cannot starve the others. Rotation is unchanged from
+// the previous per-tick behaviour.
+func (e *Engine) eligibleHandlerKeys() []string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	keys := make([]string, 0, len(e.workKeys))
+	for _, key := range e.workKeys {
+		if _, exists := e.handlers[key]; exists {
+			keys = append(keys, key)
+		}
+	}
+	slices.Sort(keys)
+	return rotateKeys(keys, &e.nextHandler)
+}
+
+// registeredKeys lists handlers in stable order, so the reconciler can decide
+// per consumer without a database read.
+func (e *Engine) registeredKeys() []string {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	keys := make([]string, 0, len(e.handlers))
@@ -458,11 +518,36 @@ func (e *Engine) handlerKeys() []string {
 		keys = append(keys, key)
 	}
 	slices.Sort(keys)
+	return keys
+}
+
+func (e *Engine) setWorkKeys(scan, claim []string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	keys := slices.Clone(scan)
+	for _, key := range claim {
+		if !slices.Contains(keys, key) {
+			keys = append(keys, key)
+		}
+	}
+	slices.Sort(keys)
+	e.workKeys = keys
+}
+
+func (e *Engine) addWorkKey(key string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if !slices.Contains(e.workKeys, key) {
+		e.workKeys = append(e.workKeys, key)
+	}
+}
+
+func rotateKeys(keys []string, counter *int) []string {
 	if len(keys) == 0 {
 		return keys
 	}
-	start := e.nextHandler % len(keys)
-	e.nextHandler = (start + 1) % len(keys)
+	start := *counter % len(keys)
+	*counter = (start + 1) % len(keys)
 	if start == 0 {
 		return keys
 	}
