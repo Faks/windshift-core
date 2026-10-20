@@ -21,7 +21,7 @@ steps:
   - name: test
     image: golang:1.27.2-alpine
     commands:
-      - apk add --no-cache bash git coreutils
+      - apk add --no-cache bash git coreutils rsync
       - git clone --depth 1 https://github.com/Faks/windshift-core-tests.git /tmp/core-tests
       - bash /tmp/core-tests/overlay.sh . -- -tags=test -count=1 ./internal/events/...
 
