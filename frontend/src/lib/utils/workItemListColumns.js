@@ -80,6 +80,8 @@ const GRID_BASE_FIXED_WIDTHS = {
   milestone: 12,
   iteration: 9,
   due_date: 7,
+  start_date: 7,
+  end_date: 7,
   created_at: 7,
   updated_at: 7,
   project: 9,

@@ -344,6 +344,42 @@
       </div>
     {/if}
 
+  {:else if column.field_identifier === 'start_date'}
+    <!-- Start Date -->
+    {#if canEdit}
+      <InlineFieldEditor
+        {item}
+        field="start_date"
+        fieldType="date"
+        placeholder={t('items.setField', { field: t('common.startDate').toLowerCase() })}
+        onitemUpdated={(detail) => onitemUpdated?.(detail)}
+        onupdateError={(detail) => onupdateError?.(detail)}
+      />
+    {:else}
+      <div class="flex items-center gap-1 text-sm whitespace-nowrap" style="color: var(--ds-text-subtle);">
+        <Calendar class="w-4 h-4 flex-shrink-0" />
+        {item.start_date ? formatDateOnly(item.start_date) : '-'}
+      </div>
+    {/if}
+
+  {:else if column.field_identifier === 'end_date'}
+    <!-- End Date -->
+    {#if canEdit}
+      <InlineFieldEditor
+        {item}
+        field="end_date"
+        fieldType="date"
+        placeholder={t('items.setField', { field: t('common.endDate').toLowerCase() })}
+        onitemUpdated={(detail) => onitemUpdated?.(detail)}
+        onupdateError={(detail) => onupdateError?.(detail)}
+      />
+    {:else}
+      <div class="flex items-center gap-1 text-sm whitespace-nowrap" style="color: var(--ds-text-subtle);">
+        <Calendar class="w-4 h-4 flex-shrink-0" />
+        {item.end_date ? formatDateOnly(item.end_date) : '-'}
+      </div>
+    {/if}
+
   {:else if column.field_identifier === 'story_points'}
     <!-- Story Points -->
     {#if canEdit}
