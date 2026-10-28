@@ -22,6 +22,10 @@ type preferencesDTO struct {
 	TUI          models.UserTUIPreferences `json:"tui"`
 	ViewState    map[string]map[string]any `json:"view_state"`
 	SavedFilters map[string]any            `json:"saved_filters"`
+	// DueDateRemindersEnabled and DueDateReminderDays drive the per-user
+	// automatic reminders for upcoming due items.
+	DueDateRemindersEnabled bool `json:"due_date_reminders_enabled"`
+	DueDateReminderDays     int  `json:"due_date_reminder_days"`
 }
 
 type tuiPreferencesPatch struct {
@@ -36,6 +40,9 @@ type preferencesPatchRequest struct {
 	TUI          Optional[tuiPreferencesPatch]       `json:"tui"`
 	ViewState    Optional[map[string]map[string]any] `json:"view_state"`
 	SavedFilters Optional[map[string]any]            `json:"saved_filters"`
+
+	DueDateRemindersEnabled Optional[bool] `json:"due_date_reminders_enabled"`
+	DueDateReminderDays     Optional[int]  `json:"due_date_reminder_days"`
 }
 
 func getPreferences(preferences preferencesApplication) readOperation[preferencesDTO] {
@@ -80,6 +87,14 @@ func updatePreferences(preferences preferencesApplication) jsonOperation[prefere
 				patch.SavedFilters = input.SavedFilters.Value
 			}
 		}
+		if input.DueDateRemindersEnabled.Set {
+			patch.DueDateRemindersEnabledSet = true
+			patch.DueDateRemindersEnabled = input.DueDateRemindersEnabled.Value
+		}
+		if input.DueDateReminderDays.Set {
+			patch.DueDateReminderDaysSet = true
+			patch.DueDateReminderDays = input.DueDateReminderDays.Value
+		}
 		if input.TUI.Set {
 			if input.TUI.Null {
 				patch.TUIThemeSet = true
@@ -121,6 +136,8 @@ func preferencesFromSnapshot(snapshot services.UserPreferencesSnapshot) preferen
 		ColorMode: snapshot.ColorMode, ThemeID: snapshot.ThemeID,
 		Theme: snapshot.Theme, TUI: snapshot.TUI,
 		ViewState: viewState, SavedFilters: savedFilters,
+		DueDateRemindersEnabled: snapshot.DueDateRemindersEnabled,
+		DueDateReminderDays:     snapshot.DueDateReminderDays,
 	}
 }
 
@@ -128,6 +145,8 @@ func preferenceMutationError(err error) error {
 	switch {
 	case errors.Is(err, services.ErrInvalidColorMode):
 		return newError(http.StatusBadRequest, "invalid_request", "color_mode must be light, dark, or system")
+	case errors.Is(err, services.ErrInvalidReminderDays):
+		return newError(http.StatusBadRequest, "invalid_request", err.Error())
 	case errors.Is(err, services.ErrPreferencesTooLarge):
 		return newError(http.StatusRequestEntityTooLarge, "payload_too_large", "Preferences exceed the storage limit")
 	case errors.Is(err, repository.ErrNotFound), errors.Is(err, sql.ErrNoRows):

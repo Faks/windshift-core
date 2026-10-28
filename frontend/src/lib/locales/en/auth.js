@@ -125,6 +125,15 @@ export default {
     languageHint: 'Your preferred language for the application interface',
     saveSettings: 'Save Settings',
     settingsSaved: 'Settings saved successfully',
+    notificationsTab: 'Notifications',
+    dueDateReminders: 'Due date reminders',
+    dueDateRemindersDesc:
+      'Get a notification when your open items approach their due date. This also covers items in your personal workspace.',
+    dueDateRemindersEnable: 'Enable due date reminders',
+    dueDateRemindersEnableHint:
+      'Reminders are only sent when you turn them on here; they are never automatic.',
+    dueDateReminderDays: 'Days before the due date',
+    dueDateReminderDaysHint: 'Choose between 1 and 30 days.',
     connectedAccounts: 'Connected Accounts',
     connectedAccountsTab: 'Accounts',
     connectedAccountsDesc:

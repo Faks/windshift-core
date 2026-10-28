@@ -18,6 +18,16 @@ var ErrInvalidColorMode = errors.New("invalid color mode")
 // than the bounded per-user JSON blob.
 var ErrPreferencesTooLarge = errors.New("user preferences exceed the storage limit")
 
+// ErrInvalidReminderDays is returned when the requested reminder lead time is
+// outside the supported range.
+var ErrInvalidReminderDays = errors.New("reminder days must be between 1 and 30")
+
+// MinReminderDays and MaxReminderDays bound the per-user reminder lead time.
+const (
+	MinReminderDays = 1
+	MaxReminderDays = 30
+)
+
 // maxPreferencesBytes bounds the serialized per-user preferences document.
 // Dashboard layout plus view state and saved filters fit comfortably; this
 // only rejects pathological growth.
@@ -30,6 +40,10 @@ type UserPreferencesSnapshot struct {
 	TUI          models.UserTUIPreferences
 	ViewState    map[string]map[string]any
 	SavedFilters map[string]any
+	// DueDateRemindersEnabled and DueDateReminderDays are the user's opt-in
+	// for automatic reminders on their upcoming due items.
+	DueDateRemindersEnabled bool
+	DueDateReminderDays     int
 }
 
 type UserPreferencesPatch struct {
@@ -51,6 +65,12 @@ type UserPreferencesPatch struct {
 	// nil scope value deletes that scope.
 	SavedFiltersSet bool
 	SavedFilters    map[string]any
+	// DueDateRemindersEnabledSet / DueDateReminderDaysSet update the user's
+	// due-date reminder opt-in and lead time independently.
+	DueDateRemindersEnabledSet bool
+	DueDateRemindersEnabled    bool
+	DueDateReminderDaysSet     bool
+	DueDateReminderDays        int
 }
 
 // UserPreferencesService owns user preference use cases.
@@ -119,11 +139,17 @@ func (s *UserPreferencesService) GetSnapshot(userID int) (UserPreferencesSnapsho
 	if err != nil {
 		return UserPreferencesSnapshot{}, err
 	}
+	remindersEnabled, reminderDays, err := s.prefsRepo.GetReminderSettings(userID)
+	if err != nil {
+		return UserPreferencesSnapshot{}, err
+	}
 	return UserPreferencesSnapshot{
 		ColorMode: colorMode, ThemeID: prefs.ThemeID,
 		Theme: theme, TUI: tui,
-		ViewState:    prefs.ViewState,
-		SavedFilters: prefs.SavedFilters,
+		ViewState:               prefs.ViewState,
+		SavedFilters:            prefs.SavedFilters,
+		DueDateRemindersEnabled: remindersEnabled,
+		DueDateReminderDays:     reminderDays,
 	}, nil
 }
 
@@ -131,6 +157,9 @@ func (s *UserPreferencesService) UpdateSnapshot(userID int, patch UserPreference
 	prefs, err := s.loadData(userID)
 	if err != nil {
 		return UserPreferencesSnapshot{}, err
+	}
+	if patch.DueDateReminderDaysSet && (patch.DueDateReminderDays < MinReminderDays || patch.DueDateReminderDays > MaxReminderDays) {
+		return UserPreferencesSnapshot{}, ErrInvalidReminderDays
 	}
 	if patch.ColorModeSet {
 		if patch.ColorMode != "light" && patch.ColorMode != "dark" && patch.ColorMode != "system" {
@@ -173,6 +202,21 @@ func (s *UserPreferencesService) UpdateSnapshot(userID int, patch UserPreference
 	}
 	if err := s.saveData(userID, prefs); err != nil {
 		return UserPreferencesSnapshot{}, err
+	}
+	if patch.DueDateRemindersEnabledSet || patch.DueDateReminderDaysSet {
+		enabled, days, err := s.prefsRepo.GetReminderSettings(userID)
+		if err != nil {
+			return UserPreferencesSnapshot{}, err
+		}
+		if patch.DueDateRemindersEnabledSet {
+			enabled = patch.DueDateRemindersEnabled
+		}
+		if patch.DueDateReminderDaysSet {
+			days = patch.DueDateReminderDays
+		}
+		if err := s.prefsRepo.UpsertReminderSettings(userID, enabled, days, time.Now()); err != nil {
+			return UserPreferencesSnapshot{}, err
+		}
 	}
 	return s.GetSnapshot(userID)
 }

@@ -121,6 +121,15 @@ export default {
     languageHint: 'Предпочитаемый язык интерфейса',
     saveSettings: 'Сохранить настройки',
     settingsSaved: 'Настройки сохранены',
+    notificationsTab: 'Уведомления',
+    dueDateReminders: 'Напоминания о сроках',
+    dueDateRemindersDesc:
+      'Получайте уведомление, когда срок ваших открытых элементов приближается. Это также касается элементов в вашем личном рабочем пространстве.',
+    dueDateRemindersEnable: 'Включить напоминания о сроках',
+    dueDateRemindersEnableHint:
+      'Напоминания отправляются только после включения здесь; они никогда не автоматические.',
+    dueDateReminderDays: 'Дней до срока',
+    dueDateReminderDaysHint: 'Выберите от 1 до 30 дней.',
     connectedAccounts: 'Учётные записи Git',
     connectedAccountsTab: 'Учётные записи',
     connectedAccountsDesc:

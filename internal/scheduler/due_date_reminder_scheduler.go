@@ -14,13 +14,10 @@ import (
 )
 
 // DueDateReminderSchedulerConfig configures the background sweep that turns
-// upcoming due dates into reminder notifications.
+// upcoming due dates into reminder notifications for users who opted in.
 type DueDateReminderSchedulerConfig struct {
 	// TickInterval is how often the sweep runs; default 1 hour.
 	TickInterval time.Duration
-	// LeadTime is how far ahead of the due date a reminder is sent; default
-	// 24 hours. Due dates are calendar dates, so the bound is date-aligned.
-	LeadTime time.Duration
 	// BatchSize caps how many due items one sweep handles; default 500.
 	BatchSize int
 }
@@ -29,16 +26,18 @@ type DueDateReminderSchedulerConfig struct {
 func DefaultDueDateReminderSchedulerConfig() DueDateReminderSchedulerConfig {
 	return DueDateReminderSchedulerConfig{
 		TickInterval: time.Hour,
-		LeadTime:     24 * time.Hour,
 		BatchSize:    500,
 	}
 }
 
 // DueDateReminderScheduler periodically creates a "reminder" notification for
-// the assignee of every open item whose due date is approaching. Delivery is
-// idempotent: the notification's delivery key is derived from the item, due
-// date, and assignee, so the unique index drops repeats and a changed due date
-// re-reminds. Email is handled by the existing notification email batching.
+// opted-in users about their open items whose due date is approaching. The
+// reminder is never automatic: only users who enabled due-date reminders in
+// their profile are notified, using their configured lead time. Assignees are
+// reminded for regular items; personal-workspace items without an assignee
+// remind their owner. Delivery is idempotent via a per-(item, user, due date)
+// ledger and a notification delivery key. Email rides the existing
+// notification email batching.
 type DueDateReminderScheduler struct {
 	db            database.Database
 	items         *repository.ItemRepository
@@ -55,9 +54,6 @@ func NewDueDateReminderScheduler(db database.Database, notifications *services.N
 	defaults := DefaultDueDateReminderSchedulerConfig()
 	if config.TickInterval <= 0 {
 		config.TickInterval = defaults.TickInterval
-	}
-	if config.LeadTime <= 0 {
-		config.LeadTime = defaults.LeadTime
 	}
 	if config.BatchSize <= 0 {
 		config.BatchSize = defaults.BatchSize
@@ -79,7 +75,6 @@ func (s *DueDateReminderScheduler) Start() {
 	slog.Info("due-date reminder scheduler started",
 		slog.String("component", "reminders"),
 		slog.Duration("tick_interval", s.config.TickInterval),
-		slog.Duration("lead_time", s.config.LeadTime),
 	)
 }
 
@@ -92,7 +87,7 @@ func (s *DueDateReminderScheduler) Stop() {
 func (s *DueDateReminderScheduler) run() {
 	defer s.wg.Done()
 	// Sweep once at startup so a restart catches reminders that came due while
-	// the process was down; the delivery key makes the extra pass idempotent.
+	// the process was down; the ledger makes the extra pass idempotent.
 	s.RunOnce(context.Background(), s.now())
 
 	t := time.NewTicker(s.config.TickInterval)
@@ -107,16 +102,20 @@ func (s *DueDateReminderScheduler) run() {
 	}
 }
 
-// RunOnce scans for due-soon items and creates their reminder notifications.
-// Exported so tests can drive a deterministic pass with an injected clock.
+// RunOnce scans for opted-in recipients' due-soon items and creates their
+// reminder notifications. Exported so tests can drive a deterministic pass
+// with an injected clock.
 func (s *DueDateReminderScheduler) RunOnce(ctx context.Context, now time.Time) {
 	if s.notifications == nil {
 		return
 	}
-	from := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	to := from.Add(s.config.LeadTime)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	// Query every opted-in recipient's items inside the widest allowed window,
+	// then apply each recipient's own lead time in Go so the window never needs
+	// engine-specific date arithmetic.
+	horizon := today.AddDate(0, 0, services.MaxReminderDays)
 
-	items, err := s.items.ListDueSoonOpenItems(from, to, s.config.BatchSize)
+	items, err := s.items.ListDueSoonItemsForReminderUsers(today, horizon, s.config.BatchSize)
 	if err != nil {
 		slog.Warn("due-date reminders: failed to list due items",
 			slog.String("component", "reminders"), slog.Any("error", err))
@@ -126,10 +125,15 @@ func (s *DueDateReminderScheduler) RunOnce(ctx context.Context, now time.Time) {
 		if err := ctx.Err(); err != nil {
 			return
 		}
-		if err := s.notify(items[i], now); err != nil {
+		item := items[i]
+		limit := today.AddDate(0, 0, item.ReminderDays)
+		if item.DueDate.After(limit) {
+			continue
+		}
+		if err := s.notify(item, now); err != nil {
 			slog.Warn("due-date reminders: failed to create reminder",
 				slog.String("component", "reminders"),
-				slog.Int("item_id", items[i].ItemID),
+				slog.Int("item_id", item.ItemID),
 				slog.Any("error", err))
 		}
 	}
@@ -138,7 +142,7 @@ func (s *DueDateReminderScheduler) RunOnce(ctx context.Context, now time.Time) {
 func (s *DueDateReminderScheduler) notify(item repository.DueSoonItem, now time.Time) error {
 	itemKey := fmt.Sprintf("%s-%d", item.WorkspaceKey, item.ItemNumber)
 	dueDate := item.DueDate.Format("2006-01-02")
-	claimed, err := s.items.ClaimDueDateReminder(item.ItemID, item.AssigneeID, dueDate)
+	claimed, err := s.items.ClaimDueDateReminder(item.ItemID, item.RecipientID, dueDate)
 	if err != nil {
 		return err
 	}
@@ -147,7 +151,7 @@ func (s *DueDateReminderScheduler) notify(item repository.DueSoonItem, now time.
 	}
 	workspaceID, itemID := item.WorkspaceID, item.ItemID
 	_, err = s.notifications.CreateNotification(models.Notification{
-		UserID:             item.AssigneeID,
+		UserID:             item.RecipientID,
 		Title:              fmt.Sprintf("Reminder: %s is due soon", itemKey),
 		Message:            fmt.Sprintf("%s is due on %s", item.Title, dueDate),
 		Type:               "reminder",
@@ -159,7 +163,7 @@ func (s *DueDateReminderScheduler) notify(item repository.DueSoonItem, now time.
 		ItemID:             &itemID,
 		SourceType:         "item.due_reminder",
 		SourceID:           &itemID,
-		DeliveryKey:        fmt.Sprintf("due-reminder:%d:%s:%d", itemID, dueDate, item.AssigneeID),
+		DeliveryKey:        fmt.Sprintf("due-reminder:%d:%s:%d", itemID, dueDate, item.RecipientID),
 	})
 	return err
 }

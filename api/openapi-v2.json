@@ -31274,6 +31274,14 @@
                 "description": "The color mode value.",
                 "type": "string"
               },
+              "due_date_reminder_days": {
+                "description": "The due date reminder days value.",
+                "type": "integer"
+              },
+              "due_date_reminders_enabled": {
+                "description": "The due date reminders enabled value.",
+                "type": "boolean"
+              },
               "saved_filters": {
                 "additionalProperties": {
                   "description": "Arbitrary JSON extension value."
@@ -31408,6 +31416,8 @@
             },
             "required": [
               "color_mode",
+              "due_date_reminder_days",
+              "due_date_reminders_enabled",
               "saved_filters",
               "tui",
               "view_state"
@@ -59051,6 +59061,16 @@
             "nullable": true,
             "type": "string"
           },
+          "due_date_reminder_days": {
+            "description": "The due date reminder days value.",
+            "nullable": true,
+            "type": "integer"
+          },
+          "due_date_reminders_enabled": {
+            "description": "The due date reminders enabled value.",
+            "nullable": true,
+            "type": "boolean"
+          },
           "saved_filters": {
             "additionalProperties": {
               "description": "Arbitrary JSON extension value."
@@ -59110,6 +59130,14 @@
               "color_mode": {
                 "description": "The color mode value.",
                 "type": "string"
+              },
+              "due_date_reminder_days": {
+                "description": "The due date reminder days value.",
+                "type": "integer"
+              },
+              "due_date_reminders_enabled": {
+                "description": "The due date reminders enabled value.",
+                "type": "boolean"
               },
               "saved_filters": {
                 "additionalProperties": {
@@ -59245,6 +59273,8 @@
             },
             "required": [
               "color_mode",
+              "due_date_reminder_days",
+              "due_date_reminders_enabled",
               "saved_filters",
               "tui",
               "view_state"

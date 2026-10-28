@@ -1,5 +1,6 @@
 <script>
 	import Bot from '@lucide/svelte/icons/bot';
+	import Bell from '@lucide/svelte/icons/bell';
 	import CalendarDays from '@lucide/svelte/icons/calendar-days';
 	import Camera from '@lucide/svelte/icons/camera';
 	import GitBranch from '@lucide/svelte/icons/git-branch';
@@ -17,6 +18,7 @@
 	import ProfileAgentsTab from '../profile/ProfileAgentsTab.svelte';
 	import ProfileAvatarTab from '../profile/ProfileAvatarTab.svelte';
 	import ProfileCalendarTab from '../profile/ProfileCalendarTab.svelte';
+	import ProfileNotificationsTab from '../profile/ProfileNotificationsTab.svelte';
 	import ProfileRegionalSettingsTab from '../profile/ProfileRegionalSettingsTab.svelte';
 	import ConnectedAccountsTab from '../settings/ConnectedAccountsTab.svelte';
 	import { attachmentStatus } from '../stores/attachmentStatus.svelte.js';
@@ -35,6 +37,12 @@
 			? [{ id: 'avatar', label: t('users.avatar'), icon: Camera }]
 			: []),
 		{ id: 'regional-settings', label: t('users.regionalSettings'), icon: Globe },
+		{
+			id: 'notifications',
+			label: t('users.notificationsTab'),
+			icon: Bell,
+			testid: 'profile-tab-notifications'
+		},
 		{
 			id: 'agents',
 			label: t('workspaceSettings.tabs.codingAgents'),
@@ -163,6 +171,9 @@
 		</div>
 		<div class:hidden={activeTab !== 'calendar-integration'}>
 			<ProfileCalendarTab />
+		</div>
+		<div class:hidden={activeTab !== 'notifications'}>
+			<ProfileNotificationsTab />
 		</div>
 
 		{#if activeTab === 'connected-accounts'}

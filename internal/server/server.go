@@ -528,7 +528,6 @@ func (s *Server) initialize() error {
 
 	s.dueDateReminderScheduler = scheduler.NewDueDateReminderScheduler(s.db, s.notificationService, scheduler.DueDateReminderSchedulerConfig{
 		TickInterval: cfg.Reminders.Interval,
-		LeadTime:     cfg.Reminders.LeadTime,
 		BatchSize:    cfg.Reminders.BatchSize,
 	})
 	s.dueDateReminderScheduler.Start()

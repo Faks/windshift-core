@@ -6,8 +6,8 @@ import (
 )
 
 // DueSoonItem is the projection the due-date reminder sweep needs: the
-// assignee to notify and enough item identity to build a deep link and
-// delivery key.
+// opted-in recipient to notify, their configured lead time, and enough item
+// identity to build a deep link and delivery key.
 type DueSoonItem struct {
 	ItemID       int
 	WorkspaceID  int
@@ -15,7 +15,9 @@ type DueSoonItem struct {
 	ItemNumber   int
 	Title        string
 	DueDate      time.Time
-	AssigneeID   int
+	RecipientID  int
+	// ReminderDays is the recipient's configured lead time in days.
+	ReminderDays int
 }
 
 // ClaimDueDateReminder records that a due-date reminder was sent for the
@@ -38,31 +40,34 @@ func (r *ItemRepository) ClaimDueDateReminder(itemID, userID int, dueDate string
 	return rows == 1, nil
 }
 
-// ListDueSoonOpenItems returns up to limit non-completed items whose due date
-// falls inside [from, to] and that have an assignee. Due dates are calendar
-// dates, so callers pass date-aligned bounds. Ordered oldest first so a capped
-// batch drains the most urgent items.
-func (r *ItemRepository) ListDueSoonOpenItems(from, to time.Time, limit int) ([]DueSoonItem, error) {
+// ListDueSoonItemsForReminderUsers returns up to limit non-completed items due
+// inside [from, to] whose recipient has opted into due-date reminders. The
+// recipient is the assignee for regular items and the workspace owner for
+// personal-workspace items without an assignee. Each row carries the
+// recipient's configured lead time so the caller can apply the per-user window.
+func (r *ItemRepository) ListDueSoonItemsForReminderUsers(from, to time.Time, limit int) ([]DueSoonItem, error) {
 	if limit <= 0 {
 		limit = 500
 	}
 	rows, err := r.db.Query(`
 		SELECT i.id, i.workspace_id, COALESCE(w.key, ''), i.workspace_item_number,
-		       i.title, i.due_date, i.assignee_id
+		       i.title, i.due_date, COALESCE(i.assignee_id, w.owner_id), up.due_date_reminder_days
 		FROM items i
 		JOIN workspaces w ON w.id = i.workspace_id
+		JOIN user_preferences up ON up.user_id = COALESCE(i.assignee_id, w.owner_id)
 		LEFT JOIN statuses st ON st.id = i.status_id
 		LEFT JOIN status_categories sc ON sc.id = st.category_id
-		WHERE i.due_date IS NOT NULL
-		  AND i.assignee_id IS NOT NULL
+		WHERE up.due_date_reminders_enabled = TRUE
+		  AND i.due_date IS NOT NULL
 		  AND i.due_date >= ?
 		  AND i.due_date <= ?
 		  AND COALESCE(sc.is_completed, FALSE) = FALSE
+		  AND (i.assignee_id IS NOT NULL OR w.is_personal = TRUE)
 		ORDER BY i.due_date ASC, i.id ASC
 		LIMIT ?
 	`, from, to, limit)
 	if err != nil {
-		return nil, fmt.Errorf("list due-soon items: %w", err)
+		return nil, fmt.Errorf("list due-soon items for reminder users: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -70,13 +75,13 @@ func (r *ItemRepository) ListDueSoonOpenItems(from, to time.Time, limit int) ([]
 	for rows.Next() {
 		var item DueSoonItem
 		if err := rows.Scan(&item.ItemID, &item.WorkspaceID, &item.WorkspaceKey, &item.ItemNumber,
-			&item.Title, &item.DueDate, &item.AssigneeID); err != nil {
-			return nil, fmt.Errorf("scan due-soon item: %w", err)
+			&item.Title, &item.DueDate, &item.RecipientID, &item.ReminderDays); err != nil {
+			return nil, fmt.Errorf("scan due-soon reminder item: %w", err)
 		}
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate due-soon items: %w", err)
+		return nil, fmt.Errorf("iterate due-soon reminder items: %w", err)
 	}
 	return items, nil
 }

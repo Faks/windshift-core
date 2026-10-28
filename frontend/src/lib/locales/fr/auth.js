@@ -125,6 +125,15 @@ export default {
     languageHint: 'Votre langue préférée pour l’interface de l’application',
     saveSettings: 'Enregistrer les paramètres',
     settingsSaved: 'Paramètres enregistrés avec succès',
+    notificationsTab: 'Notifications',
+    dueDateReminders: "Rappels d'échéance",
+    dueDateRemindersDesc:
+      "Recevez une notification lorsque vos éléments ouverts approchent de leur échéance. Cela couvre aussi les éléments de votre espace de travail personnel.",
+    dueDateRemindersEnable: "Activer les rappels d'échéance",
+    dueDateRemindersEnableHint:
+      "Les rappels ne sont envoyés que si vous les activez ici ; ils ne sont jamais automatiques.",
+    dueDateReminderDays: "Jours avant l'échéance",
+    dueDateReminderDaysHint: 'Choisissez entre 1 et 30 jours.',
     connectedAccounts: 'Comptes connectés',
     connectedAccountsTab: 'Comptes',
     connectedAccountsDesc:

@@ -3034,6 +3034,20 @@ var Catalog = []Migration{
 			CREATE INDEX IF NOT EXISTS idx_item_due_reminders_item ON item_due_reminders(item_id);
 		`,
 	},
+	{
+		Version:       "20261114_user_due_date_reminder_prefs",
+		Name:          "Add per-user due-date reminder preferences",
+		CheckSQLite:   "SELECT CASE WHEN (SELECT COUNT(*) FROM pragma_table_info('user_preferences') WHERE name IN ('due_date_reminders_enabled','due_date_reminder_days')) = 2 THEN 1 ELSE 0 END",
+		CheckPostgres: "SELECT CASE WHEN (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='user_preferences' AND column_name IN ('due_date_reminders_enabled','due_date_reminder_days')) = 2 THEN 1 ELSE 0 END",
+		SQLite: `
+			ALTER TABLE user_preferences ADD COLUMN due_date_reminders_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+			ALTER TABLE user_preferences ADD COLUMN due_date_reminder_days INTEGER NOT NULL DEFAULT 3;
+		`,
+		Postgres: `
+			ALTER TABLE user_preferences ADD COLUMN due_date_reminders_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+			ALTER TABLE user_preferences ADD COLUMN due_date_reminder_days INTEGER NOT NULL DEFAULT 3;
+		`,
+	},
 }
 
 // applyAssetReportsWorkspacePinned backfills form-mode asset reports that have
