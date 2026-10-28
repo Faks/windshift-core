@@ -280,3 +280,15 @@ CREATE TABLE IF NOT EXISTS item_import_rows (
 
 CREATE INDEX IF NOT EXISTS idx_item_import_rows_job_id ON item_import_rows(job_id);
 CREATE INDEX IF NOT EXISTS idx_item_import_rows_item_id ON item_import_rows(item_id);
+
+-- Due-date reminder ledger: see items.sql for the table contract.
+CREATE TABLE IF NOT EXISTS item_due_reminders (
+	id SERIAL PRIMARY KEY,
+	item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+	user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	due_date TEXT NOT NULL,
+	sent_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	UNIQUE(item_id, user_id, due_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_item_due_reminders_item ON item_due_reminders(item_id);

@@ -282,6 +282,11 @@ func Load(frontend embed.FS, shutdownChan chan os.Signal) Config {
 			OutboxInterval:  parseDurationEnv("WINDSHIFT_EMAIL_OUTBOX_INTERVAL", 0),
 			OutboxBatchSize: parseIntEnv("WINDSHIFT_EMAIL_OUTBOX_BATCH_SIZE", 0),
 		},
+		Reminders: ReminderConfig{
+			Interval:  parseDurationEnv("WINDSHIFT_REMINDER_INTERVAL", 0),
+			LeadTime:  parseDurationEnv("WINDSHIFT_REMINDER_LEAD_TIME", 0),
+			BatchSize: parseIntEnv("WINDSHIFT_REMINDER_BATCH_SIZE", 0),
+		},
 		Email: EmailConfig{
 			PollInterval:    parseDurationEnv("WINDSHIFT_EMAIL_POLL_INTERVAL", 0),
 			BatchSize:       parseIntEnv("WINDSHIFT_EMAIL_BATCH_SIZE", 0),

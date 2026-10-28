@@ -142,6 +142,7 @@ type Server struct {
 	notificationManager          *handlers.NotificationManager
 	notificationService          *services.NotificationService
 	notificationScheduler        *scheduler.NotificationScheduler
+	dueDateReminderScheduler     *scheduler.DueDateReminderScheduler
 	outboundEmailScheduler       *scheduler.OutboundEmailScheduler
 	recurrenceScheduler          *scheduler.RecurrenceScheduler
 	cfvCleanupScheduler          *scheduler.CFVCleanupScheduler
@@ -524,6 +525,13 @@ func (s *Server) initialize() error {
 	}
 	s.notificationScheduler.Start()
 	slog.Info("notification scheduler started")
+
+	s.dueDateReminderScheduler = scheduler.NewDueDateReminderScheduler(s.db, s.notificationService, scheduler.DueDateReminderSchedulerConfig{
+		TickInterval: cfg.Reminders.Interval,
+		LeadTime:     cfg.Reminders.LeadTime,
+		BatchSize:    cfg.Reminders.BatchSize,
+	})
+	s.dueDateReminderScheduler.Start()
 
 	// The outbound email pool drains the threaded-reply and @mention outboxes
 	// on a fast, bounded cadence, separate from the 5-minute digest batching.
@@ -2368,6 +2376,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.notificationScheduler != nil {
 		slog.Info("stopping notification scheduler")
 		s.notificationScheduler.Stop()
+	}
+
+	if s.dueDateReminderScheduler != nil {
+		slog.Info("stopping due-date reminder scheduler")
+		s.dueDateReminderScheduler.Stop()
 	}
 
 	if s.outboundEmailScheduler != nil {

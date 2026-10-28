@@ -256,4 +256,19 @@ CREATE TABLE IF NOT EXISTS item_import_rows (
 CREATE INDEX IF NOT EXISTS idx_item_import_rows_job_id ON item_import_rows(job_id);
 CREATE INDEX IF NOT EXISTS idx_item_import_rows_item_id ON item_import_rows(item_id);
 
+-- Due-date reminder ledger: one row per (item, user, due date) reminder that
+-- has been sent, so dismissing the notification cannot resurrect it.
+CREATE TABLE IF NOT EXISTS item_due_reminders (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	item_id INTEGER NOT NULL,
+	user_id INTEGER NOT NULL,
+	due_date TEXT NOT NULL,
+	sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	UNIQUE(item_id, user_id, due_date),
+	FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_item_due_reminders_item ON item_due_reminders(item_id);
+
 -- migration: 0000_baseline

@@ -3004,6 +3004,36 @@ var Catalog = []Migration{
 		SQLite:        "ALTER TABLE audit_logs ADD COLUMN source TEXT NOT NULL DEFAULT ''",
 		Postgres:      "ALTER TABLE audit_logs ADD COLUMN source TEXT NOT NULL DEFAULT ''",
 	},
+	{
+		Version:       "20261113_item_due_reminders",
+		Name:          "Record sent due-date reminders so dismissed reminders are not re-created",
+		CheckSQLite:   sqliteTableCheck("item_due_reminders"),
+		CheckPostgres: pgTableCheck("item_due_reminders"),
+		SQLite: `
+			CREATE TABLE IF NOT EXISTS item_due_reminders (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				item_id INTEGER NOT NULL,
+				user_id INTEGER NOT NULL,
+				due_date TEXT NOT NULL,
+				sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE(item_id, user_id, due_date),
+				FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+			);
+			CREATE INDEX IF NOT EXISTS idx_item_due_reminders_item ON item_due_reminders(item_id);
+		`,
+		Postgres: `
+			CREATE TABLE IF NOT EXISTS item_due_reminders (
+				id SERIAL PRIMARY KEY,
+				item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+				user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+				due_date TEXT NOT NULL,
+				sent_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE(item_id, user_id, due_date)
+			);
+			CREATE INDEX IF NOT EXISTS idx_item_due_reminders_item ON item_due_reminders(item_id);
+		`,
+	},
 }
 
 // applyAssetReportsWorkspacePinned backfills form-mode asset reports that have

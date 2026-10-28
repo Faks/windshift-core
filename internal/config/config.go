@@ -52,6 +52,7 @@ type Config struct {
 	CodingAgent  CodingAgentConfig
 	Logbook      LogbookConfig
 	Notification NotificationConfig
+	Reminders    ReminderConfig
 	Email        EmailConfig
 	OutboundTLS  OutboundTLSConfig
 	Push         PushConfig
@@ -228,6 +229,19 @@ type CodingAgentConfig struct {
 // LogbookConfig holds the URL of the logbook sidecar (if any).
 type LogbookConfig struct {
 	Endpoint string
+}
+
+// ReminderConfig holds the due-date reminder scheduler knobs.
+type ReminderConfig struct {
+	// Interval is how often the scheduler scans for due-soon items
+	// (WINDSHIFT_REMINDER_INTERVAL). Zero means the built-in default (1 hour).
+	Interval time.Duration
+	// LeadTime is how far ahead of the due date a reminder is sent
+	// (WINDSHIFT_REMINDER_LEAD_TIME). Zero means the built-in default (24 hours).
+	LeadTime time.Duration
+	// BatchSize caps how many due items one scan handles
+	// (WINDSHIFT_REMINDER_BATCH_SIZE). Zero means the built-in default (500).
+	BatchSize int
 }
 
 // NotificationConfig holds the notification WriteBatcher tuning knobs.
