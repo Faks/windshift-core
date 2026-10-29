@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -54,9 +55,47 @@ func (ps *PermissionService) inheritedAgentPermissionCache(userID int) (*models.
 	if err != nil {
 		return nil, false, err
 	}
-	agentCache := *ownerCache
+	agentCache := cloneUserPermissionCache(ownerCache)
 	agentCache.UserID = userID
-	return &agentCache, true, nil
+	return agentCache, true, nil
+}
+
+// cloneUserPermissionCache returns a deep copy so a cached snapshot is never
+// mutated through an alias. The typed cache hands out shared pointers, so the
+// agent snapshot must not share maps or slices with the owner snapshot.
+func cloneUserPermissionCache(source *models.UserPermissionCache) *models.UserPermissionCache {
+	if source == nil {
+		return nil
+	}
+	clone := *source
+	clone.GlobalPermissions = maps.Clone(source.GlobalPermissions)
+	clone.WorkspacePermissions = cloneWorkspacePermissionMap(source.WorkspacePermissions)
+	clone.WorkspaceEveryone = cloneWorkspacePermissionMap(source.WorkspaceEveryone)
+	clone.GroupMemberships = slices.Clone(source.GroupMemberships)
+	clone.RoleAssignments = make(map[int][]int, len(source.RoleAssignments))
+	for workspaceID, roles := range source.RoleAssignments {
+		clone.RoleAssignments[workspaceID] = slices.Clone(roles)
+	}
+	clone.DirectPermissions = make(map[int][]string, len(source.DirectPermissions))
+	for workspaceID, permissions := range source.DirectPermissions {
+		clone.DirectPermissions[workspaceID] = slices.Clone(permissions)
+	}
+	clone.PermissionSources = make(map[int]map[string]string, len(source.PermissionSources))
+	for workspaceID, sources := range source.PermissionSources {
+		clone.PermissionSources[workspaceID] = maps.Clone(sources)
+	}
+	return &clone
+}
+
+func cloneWorkspacePermissionMap(source map[int]map[string]bool) map[int]map[string]bool {
+	if source == nil {
+		return nil
+	}
+	clone := make(map[int]map[string]bool, len(source))
+	for workspaceID, permissions := range source {
+		clone[workspaceID] = maps.Clone(permissions)
+	}
+	return clone
 }
 
 func (b *permissionCacheBuilder) loadSystemAdmin() (bool, error) {
