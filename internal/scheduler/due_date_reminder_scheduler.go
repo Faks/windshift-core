@@ -40,12 +40,13 @@ func DefaultDueDateReminderSchedulerConfig() DueDateReminderSchedulerConfig {
 // ledger that outlives the notification row keeps a dismissed reminder from
 // being recreated. Email rides the existing notification email batching.
 type DueDateReminderScheduler struct {
-	db            database.Database
 	items         *repository.ItemRepository
 	notifications *services.NotificationService
 	config        DueDateReminderSchedulerConfig
 	stopChan      chan struct{}
 	wg            sync.WaitGroup
+	startOnce     sync.Once
+	stopOnce      sync.Once
 	// now is overridable for tests; production uses wall-clock time.
 	now func() time.Time
 }
@@ -60,7 +61,6 @@ func NewDueDateReminderScheduler(db database.Database, notifications *services.N
 		config.BatchSize = defaults.BatchSize
 	}
 	return &DueDateReminderScheduler{
-		db:            db,
 		items:         repository.NewItemRepository(db),
 		notifications: notifications,
 		config:        config,
@@ -69,19 +69,23 @@ func NewDueDateReminderScheduler(db database.Database, notifications *services.N
 	}
 }
 
-// Start launches the background sweep. Idempotent per scheduler instance.
+// Start launches the background sweep. It is safe to call more than once: only
+// the first call starts a worker.
 func (s *DueDateReminderScheduler) Start() {
-	s.wg.Add(1)
-	go s.run()
-	slog.Info("due-date reminder scheduler started",
-		slog.String("component", "reminders"),
-		slog.Duration("tick_interval", s.config.TickInterval),
-	)
+	s.startOnce.Do(func() {
+		s.wg.Add(1)
+		go s.run()
+		slog.Info("due-date reminder scheduler started",
+			slog.String("component", "reminders"),
+			slog.Duration("tick_interval", s.config.TickInterval),
+		)
+	})
 }
 
-// Stop signals shutdown and waits for the worker to drain.
+// Stop signals shutdown and waits for the worker to drain. It is safe to call
+// more than once; only the first call closes the stop channel.
 func (s *DueDateReminderScheduler) Stop() {
-	close(s.stopChan)
+	s.stopOnce.Do(func() { close(s.stopChan) })
 	s.wg.Wait()
 }
 
