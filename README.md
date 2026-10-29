@@ -145,7 +145,7 @@ We are especially interested in early bug reports and real-world feedback about 
 
 - Backend: Go
 - Frontend: Svelte, Vite, and Tailwind CSS
-- Database: SQLite by default, with PostgreSQL support
+- Database: SQLite by default, with PostgreSQL 15+ support
 
 ## Documentation
 
