@@ -5,9 +5,9 @@ import IconFlag from '@tabler/icons-svelte-runes/icons/flag';
 import IconFolderSearch from '@tabler/icons-svelte-runes/icons/folder-search';
 import IconPackage from '@tabler/icons-svelte-runes/icons/package';
 import IconPhoneCheck from '@tabler/icons-svelte-runes/icons/phone-check';
-import IconPlanet from '@tabler/icons-svelte-runes/icons/planet';
 import IconSettings from '@tabler/icons-svelte-runes/icons/settings';
 import IconUsers from '@tabler/icons-svelte-runes/icons/users';
+import IconWorldSearch from '@tabler/icons-svelte-runes/icons/world-search';
 
 /**
  * @typedef {Object} NavItem
@@ -67,7 +67,7 @@ export const mainNavItems = [
   },
   {
     id: 'portal-hub',
-    icon: IconPlanet,
+    icon: IconWorldSearch,
     labelKey: 'nav.portalHub',
     href: '/channels',
     activeViews: ['hub', 'hub-inbox', 'channels'],
