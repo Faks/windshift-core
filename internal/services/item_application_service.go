@@ -2008,9 +2008,6 @@ func (s *ItemApplicationService) enrich(ctx context.Context, userID int, items [
 	if err := repository.NewLabelRepository(s.db).LoadForItemsContext(ctx, items); err != nil {
 		return err
 	}
-	if err := LoadPersonalLabelsForItems(ctx, s.db, items, userID); err != nil {
-		return err
-	}
 	return repository.NewMilestoneAttachRepository(s.db).LoadForItemsContext(ctx, items)
 }
 

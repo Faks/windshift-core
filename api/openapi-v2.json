@@ -10976,50 +10976,6 @@
                   "nullable": true,
                   "type": "integer"
                 },
-                "personal_labels": {
-                  "description": "The personal labels value.",
-                  "items": {
-                    "additionalProperties": false,
-                    "properties": {
-                      "color": {
-                        "description": "The color value.",
-                        "type": "string"
-                      },
-                      "created_at": {
-                        "description": "The created at value.",
-                        "format": "date-time",
-                        "type": "string"
-                      },
-                      "id": {
-                        "description": "The id value.",
-                        "type": "integer"
-                      },
-                      "name": {
-                        "description": "The name value.",
-                        "type": "string"
-                      },
-                      "updated_at": {
-                        "description": "The updated at value.",
-                        "format": "date-time",
-                        "type": "string"
-                      },
-                      "user_id": {
-                        "description": "The user id value.",
-                        "nullable": true,
-                        "type": "integer"
-                      }
-                    },
-                    "required": [
-                      "color",
-                      "created_at",
-                      "id",
-                      "name",
-                      "updated_at"
-                    ],
-                    "type": "object"
-                  },
-                  "type": "array"
-                },
                 "portal_org_shared": {
                   "description": "The portal org shared value.",
                   "type": "boolean"
@@ -12322,50 +12278,6 @@
                   "description": "The parent workspace item number value.",
                   "nullable": true,
                   "type": "integer"
-                },
-                "personal_labels": {
-                  "description": "The personal labels value.",
-                  "items": {
-                    "additionalProperties": false,
-                    "properties": {
-                      "color": {
-                        "description": "The color value.",
-                        "type": "string"
-                      },
-                      "created_at": {
-                        "description": "The created at value.",
-                        "format": "date-time",
-                        "type": "string"
-                      },
-                      "id": {
-                        "description": "The id value.",
-                        "type": "integer"
-                      },
-                      "name": {
-                        "description": "The name value.",
-                        "type": "string"
-                      },
-                      "updated_at": {
-                        "description": "The updated at value.",
-                        "format": "date-time",
-                        "type": "string"
-                      },
-                      "user_id": {
-                        "description": "The user id value.",
-                        "nullable": true,
-                        "type": "integer"
-                      }
-                    },
-                    "required": [
-                      "color",
-                      "created_at",
-                      "id",
-                      "name",
-                      "updated_at"
-                    ],
-                    "type": "object"
-                  },
-                  "type": "array"
                 },
                 "portal_org_shared": {
                   "description": "The portal org shared value.",
@@ -13803,50 +13715,6 @@
                   "nullable": true,
                   "type": "integer"
                 },
-                "personal_labels": {
-                  "description": "The personal labels value.",
-                  "items": {
-                    "additionalProperties": false,
-                    "properties": {
-                      "color": {
-                        "description": "The color value.",
-                        "type": "string"
-                      },
-                      "created_at": {
-                        "description": "The created at value.",
-                        "format": "date-time",
-                        "type": "string"
-                      },
-                      "id": {
-                        "description": "The id value.",
-                        "type": "integer"
-                      },
-                      "name": {
-                        "description": "The name value.",
-                        "type": "string"
-                      },
-                      "updated_at": {
-                        "description": "The updated at value.",
-                        "format": "date-time",
-                        "type": "string"
-                      },
-                      "user_id": {
-                        "description": "The user id value.",
-                        "nullable": true,
-                        "type": "integer"
-                      }
-                    },
-                    "required": [
-                      "color",
-                      "created_at",
-                      "id",
-                      "name",
-                      "updated_at"
-                    ],
-                    "type": "object"
-                  },
-                  "type": "array"
-                },
                 "portal_org_shared": {
                   "description": "The portal org shared value.",
                   "type": "boolean"
@@ -15053,50 +14921,6 @@
                   "nullable": true,
                   "type": "integer"
                 },
-                "personal_labels": {
-                  "description": "The personal labels value.",
-                  "items": {
-                    "additionalProperties": false,
-                    "properties": {
-                      "color": {
-                        "description": "The color value.",
-                        "type": "string"
-                      },
-                      "created_at": {
-                        "description": "The created at value.",
-                        "format": "date-time",
-                        "type": "string"
-                      },
-                      "id": {
-                        "description": "The id value.",
-                        "type": "integer"
-                      },
-                      "name": {
-                        "description": "The name value.",
-                        "type": "string"
-                      },
-                      "updated_at": {
-                        "description": "The updated at value.",
-                        "format": "date-time",
-                        "type": "string"
-                      },
-                      "user_id": {
-                        "description": "The user id value.",
-                        "nullable": true,
-                        "type": "integer"
-                      }
-                    },
-                    "required": [
-                      "color",
-                      "created_at",
-                      "id",
-                      "name",
-                      "updated_at"
-                    ],
-                    "type": "object"
-                  },
-                  "type": "array"
-                },
                 "portal_org_shared": {
                   "description": "The portal org shared value.",
                   "type": "boolean"
@@ -16097,50 +15921,6 @@
                       "description": "The parent workspace item number value.",
                       "nullable": true,
                       "type": "integer"
-                    },
-                    "personal_labels": {
-                      "description": "The personal labels value.",
-                      "items": {
-                        "additionalProperties": false,
-                        "properties": {
-                          "color": {
-                            "description": "The color value.",
-                            "type": "string"
-                          },
-                          "created_at": {
-                            "description": "The created at value.",
-                            "format": "date-time",
-                            "type": "string"
-                          },
-                          "id": {
-                            "description": "The id value.",
-                            "type": "integer"
-                          },
-                          "name": {
-                            "description": "The name value.",
-                            "type": "string"
-                          },
-                          "updated_at": {
-                            "description": "The updated at value.",
-                            "format": "date-time",
-                            "type": "string"
-                          },
-                          "user_id": {
-                            "description": "The user id value.",
-                            "nullable": true,
-                            "type": "integer"
-                          }
-                        },
-                        "required": [
-                          "color",
-                          "created_at",
-                          "id",
-                          "name",
-                          "updated_at"
-                        ],
-                        "type": "object"
-                      },
-                      "type": "array"
                     },
                     "portal_org_shared": {
                       "description": "The portal org shared value.",
@@ -17186,50 +16966,6 @@
                       "description": "The parent workspace item number value.",
                       "nullable": true,
                       "type": "integer"
-                    },
-                    "personal_labels": {
-                      "description": "The personal labels value.",
-                      "items": {
-                        "additionalProperties": false,
-                        "properties": {
-                          "color": {
-                            "description": "The color value.",
-                            "type": "string"
-                          },
-                          "created_at": {
-                            "description": "The created at value.",
-                            "format": "date-time",
-                            "type": "string"
-                          },
-                          "id": {
-                            "description": "The id value.",
-                            "type": "integer"
-                          },
-                          "name": {
-                            "description": "The name value.",
-                            "type": "string"
-                          },
-                          "updated_at": {
-                            "description": "The updated at value.",
-                            "format": "date-time",
-                            "type": "string"
-                          },
-                          "user_id": {
-                            "description": "The user id value.",
-                            "nullable": true,
-                            "type": "integer"
-                          }
-                        },
-                        "required": [
-                          "color",
-                          "created_at",
-                          "id",
-                          "name",
-                          "updated_at"
-                        ],
-                        "type": "object"
-                      },
-                      "type": "array"
                     },
                     "portal_org_shared": {
                       "description": "The portal org shared value.",
@@ -18332,50 +18068,6 @@
                     "description": "The parent workspace item number value.",
                     "nullable": true,
                     "type": "integer"
-                  },
-                  "personal_labels": {
-                    "description": "The personal labels value.",
-                    "items": {
-                      "additionalProperties": false,
-                      "properties": {
-                        "color": {
-                          "description": "The color value.",
-                          "type": "string"
-                        },
-                        "created_at": {
-                          "description": "The created at value.",
-                          "format": "date-time",
-                          "type": "string"
-                        },
-                        "id": {
-                          "description": "The id value.",
-                          "type": "integer"
-                        },
-                        "name": {
-                          "description": "The name value.",
-                          "type": "string"
-                        },
-                        "updated_at": {
-                          "description": "The updated at value.",
-                          "format": "date-time",
-                          "type": "string"
-                        },
-                        "user_id": {
-                          "description": "The user id value.",
-                          "nullable": true,
-                          "type": "integer"
-                        }
-                      },
-                      "required": [
-                        "color",
-                        "created_at",
-                        "id",
-                        "name",
-                        "updated_at"
-                      ],
-                      "type": "object"
-                    },
-                    "type": "array"
                   },
                   "portal_org_shared": {
                     "description": "The portal org shared value.",
@@ -21499,50 +21191,6 @@
                   "nullable": true,
                   "type": "integer"
                 },
-                "personal_labels": {
-                  "description": "The personal labels value.",
-                  "items": {
-                    "additionalProperties": false,
-                    "properties": {
-                      "color": {
-                        "description": "The color value.",
-                        "type": "string"
-                      },
-                      "created_at": {
-                        "description": "The created at value.",
-                        "format": "date-time",
-                        "type": "string"
-                      },
-                      "id": {
-                        "description": "The id value.",
-                        "type": "integer"
-                      },
-                      "name": {
-                        "description": "The name value.",
-                        "type": "string"
-                      },
-                      "updated_at": {
-                        "description": "The updated at value.",
-                        "format": "date-time",
-                        "type": "string"
-                      },
-                      "user_id": {
-                        "description": "The user id value.",
-                        "nullable": true,
-                        "type": "integer"
-                      }
-                    },
-                    "required": [
-                      "color",
-                      "created_at",
-                      "id",
-                      "name",
-                      "updated_at"
-                    ],
-                    "type": "object"
-                  },
-                  "type": "array"
-                },
                 "portal_org_shared": {
                   "description": "The portal org shared value.",
                   "type": "boolean"
@@ -22755,50 +22403,6 @@
                 "description": "The parent workspace item number value.",
                 "nullable": true,
                 "type": "integer"
-              },
-              "personal_labels": {
-                "description": "The personal labels value.",
-                "items": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "color": {
-                      "description": "The color value.",
-                      "type": "string"
-                    },
-                    "created_at": {
-                      "description": "The created at value.",
-                      "format": "date-time",
-                      "type": "string"
-                    },
-                    "id": {
-                      "description": "The id value.",
-                      "type": "integer"
-                    },
-                    "name": {
-                      "description": "The name value.",
-                      "type": "string"
-                    },
-                    "updated_at": {
-                      "description": "The updated at value.",
-                      "format": "date-time",
-                      "type": "string"
-                    },
-                    "user_id": {
-                      "description": "The user id value.",
-                      "nullable": true,
-                      "type": "integer"
-                    }
-                  },
-                  "required": [
-                    "color",
-                    "created_at",
-                    "id",
-                    "name",
-                    "updated_at"
-                  ],
-                  "type": "object"
-                },
-                "type": "array"
               },
               "portal_org_shared": {
                 "description": "The portal org shared value.",
@@ -24575,50 +24179,6 @@
                   "nullable": true,
                   "type": "integer"
                 },
-                "personal_labels": {
-                  "description": "The personal labels value.",
-                  "items": {
-                    "additionalProperties": false,
-                    "properties": {
-                      "color": {
-                        "description": "The color value.",
-                        "type": "string"
-                      },
-                      "created_at": {
-                        "description": "The created at value.",
-                        "format": "date-time",
-                        "type": "string"
-                      },
-                      "id": {
-                        "description": "The id value.",
-                        "type": "integer"
-                      },
-                      "name": {
-                        "description": "The name value.",
-                        "type": "string"
-                      },
-                      "updated_at": {
-                        "description": "The updated at value.",
-                        "format": "date-time",
-                        "type": "string"
-                      },
-                      "user_id": {
-                        "description": "The user id value.",
-                        "nullable": true,
-                        "type": "integer"
-                      }
-                    },
-                    "required": [
-                      "color",
-                      "created_at",
-                      "id",
-                      "name",
-                      "updated_at"
-                    ],
-                    "type": "object"
-                  },
-                  "type": "array"
-                },
                 "portal_org_shared": {
                   "description": "The portal org shared value.",
                   "type": "boolean"
@@ -25644,50 +25204,6 @@
                   "description": "The parent workspace item number value.",
                   "nullable": true,
                   "type": "integer"
-                },
-                "personal_labels": {
-                  "description": "The personal labels value.",
-                  "items": {
-                    "additionalProperties": false,
-                    "properties": {
-                      "color": {
-                        "description": "The color value.",
-                        "type": "string"
-                      },
-                      "created_at": {
-                        "description": "The created at value.",
-                        "format": "date-time",
-                        "type": "string"
-                      },
-                      "id": {
-                        "description": "The id value.",
-                        "type": "integer"
-                      },
-                      "name": {
-                        "description": "The name value.",
-                        "type": "string"
-                      },
-                      "updated_at": {
-                        "description": "The updated at value.",
-                        "format": "date-time",
-                        "type": "string"
-                      },
-                      "user_id": {
-                        "description": "The user id value.",
-                        "nullable": true,
-                        "type": "integer"
-                      }
-                    },
-                    "required": [
-                      "color",
-                      "created_at",
-                      "id",
-                      "name",
-                      "updated_at"
-                    ],
-                    "type": "object"
-                  },
-                  "type": "array"
                 },
                 "portal_org_shared": {
                   "description": "The portal org shared value.",
@@ -43372,50 +42888,6 @@
                   "nullable": true,
                   "type": "integer"
                 },
-                "personal_labels": {
-                  "description": "The personal labels value.",
-                  "items": {
-                    "additionalProperties": false,
-                    "properties": {
-                      "color": {
-                        "description": "The color value.",
-                        "type": "string"
-                      },
-                      "created_at": {
-                        "description": "The created at value.",
-                        "format": "date-time",
-                        "type": "string"
-                      },
-                      "id": {
-                        "description": "The id value.",
-                        "type": "integer"
-                      },
-                      "name": {
-                        "description": "The name value.",
-                        "type": "string"
-                      },
-                      "updated_at": {
-                        "description": "The updated at value.",
-                        "format": "date-time",
-                        "type": "string"
-                      },
-                      "user_id": {
-                        "description": "The user id value.",
-                        "nullable": true,
-                        "type": "integer"
-                      }
-                    },
-                    "required": [
-                      "color",
-                      "created_at",
-                      "id",
-                      "name",
-                      "updated_at"
-                    ],
-                    "type": "object"
-                  },
-                  "type": "array"
-                },
                 "portal_org_shared": {
                   "description": "The portal org shared value.",
                   "type": "boolean"
@@ -45993,50 +45465,6 @@
                       "nullable": true,
                       "type": "integer"
                     },
-                    "personal_labels": {
-                      "description": "The personal labels value.",
-                      "items": {
-                        "additionalProperties": false,
-                        "properties": {
-                          "color": {
-                            "description": "The color value.",
-                            "type": "string"
-                          },
-                          "created_at": {
-                            "description": "The created at value.",
-                            "format": "date-time",
-                            "type": "string"
-                          },
-                          "id": {
-                            "description": "The id value.",
-                            "type": "integer"
-                          },
-                          "name": {
-                            "description": "The name value.",
-                            "type": "string"
-                          },
-                          "updated_at": {
-                            "description": "The updated at value.",
-                            "format": "date-time",
-                            "type": "string"
-                          },
-                          "user_id": {
-                            "description": "The user id value.",
-                            "nullable": true,
-                            "type": "integer"
-                          }
-                        },
-                        "required": [
-                          "color",
-                          "created_at",
-                          "id",
-                          "name",
-                          "updated_at"
-                        ],
-                        "type": "object"
-                      },
-                      "type": "array"
-                    },
                     "portal_org_shared": {
                       "description": "The portal org shared value.",
                       "type": "boolean"
@@ -47081,50 +46509,6 @@
                       "description": "The parent workspace item number value.",
                       "nullable": true,
                       "type": "integer"
-                    },
-                    "personal_labels": {
-                      "description": "The personal labels value.",
-                      "items": {
-                        "additionalProperties": false,
-                        "properties": {
-                          "color": {
-                            "description": "The color value.",
-                            "type": "string"
-                          },
-                          "created_at": {
-                            "description": "The created at value.",
-                            "format": "date-time",
-                            "type": "string"
-                          },
-                          "id": {
-                            "description": "The id value.",
-                            "type": "integer"
-                          },
-                          "name": {
-                            "description": "The name value.",
-                            "type": "string"
-                          },
-                          "updated_at": {
-                            "description": "The updated at value.",
-                            "format": "date-time",
-                            "type": "string"
-                          },
-                          "user_id": {
-                            "description": "The user id value.",
-                            "nullable": true,
-                            "type": "integer"
-                          }
-                        },
-                        "required": [
-                          "color",
-                          "created_at",
-                          "id",
-                          "name",
-                          "updated_at"
-                        ],
-                        "type": "object"
-                      },
-                      "type": "array"
                     },
                     "portal_org_shared": {
                       "description": "The portal org shared value.",
@@ -48227,50 +47611,6 @@
                     "description": "The parent workspace item number value.",
                     "nullable": true,
                     "type": "integer"
-                  },
-                  "personal_labels": {
-                    "description": "The personal labels value.",
-                    "items": {
-                      "additionalProperties": false,
-                      "properties": {
-                        "color": {
-                          "description": "The color value.",
-                          "type": "string"
-                        },
-                        "created_at": {
-                          "description": "The created at value.",
-                          "format": "date-time",
-                          "type": "string"
-                        },
-                        "id": {
-                          "description": "The id value.",
-                          "type": "integer"
-                        },
-                        "name": {
-                          "description": "The name value.",
-                          "type": "string"
-                        },
-                        "updated_at": {
-                          "description": "The updated at value.",
-                          "format": "date-time",
-                          "type": "string"
-                        },
-                        "user_id": {
-                          "description": "The user id value.",
-                          "nullable": true,
-                          "type": "integer"
-                        }
-                      },
-                      "required": [
-                        "color",
-                        "created_at",
-                        "id",
-                        "name",
-                        "updated_at"
-                      ],
-                      "type": "object"
-                    },
-                    "type": "array"
                   },
                   "portal_org_shared": {
                     "description": "The portal org shared value.",
@@ -50441,50 +49781,6 @@
                 "nullable": true,
                 "type": "integer"
               },
-              "personal_labels": {
-                "description": "The personal labels value.",
-                "items": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "color": {
-                      "description": "The color value.",
-                      "type": "string"
-                    },
-                    "created_at": {
-                      "description": "The created at value.",
-                      "format": "date-time",
-                      "type": "string"
-                    },
-                    "id": {
-                      "description": "The id value.",
-                      "type": "integer"
-                    },
-                    "name": {
-                      "description": "The name value.",
-                      "type": "string"
-                    },
-                    "updated_at": {
-                      "description": "The updated at value.",
-                      "format": "date-time",
-                      "type": "string"
-                    },
-                    "user_id": {
-                      "description": "The user id value.",
-                      "nullable": true,
-                      "type": "integer"
-                    }
-                  },
-                  "required": [
-                    "color",
-                    "created_at",
-                    "id",
-                    "name",
-                    "updated_at"
-                  ],
-                  "type": "object"
-                },
-                "type": "array"
-              },
               "portal_org_shared": {
                 "description": "The portal org shared value.",
                 "type": "boolean"
@@ -50997,14 +50293,6 @@
             "nullable": true,
             "readOnly": true,
             "type": "integer"
-          },
-          "personal_labels": {
-            "description": "Personal labels attached to the item.",
-            "items": {
-              "$ref": "#/components/schemas/PersonalLabel"
-            },
-            "readOnly": true,
-            "type": "array"
           },
           "priority_builtin_key": {
             "description": "Stable built-in priority key.",
@@ -55886,50 +55174,6 @@
                 "nullable": true,
                 "type": "integer"
               },
-              "personal_labels": {
-                "description": "The personal labels value.",
-                "items": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "color": {
-                      "description": "The color value.",
-                      "type": "string"
-                    },
-                    "created_at": {
-                      "description": "The created at value.",
-                      "format": "date-time",
-                      "type": "string"
-                    },
-                    "id": {
-                      "description": "The id value.",
-                      "type": "integer"
-                    },
-                    "name": {
-                      "description": "The name value.",
-                      "type": "string"
-                    },
-                    "updated_at": {
-                      "description": "The updated at value.",
-                      "format": "date-time",
-                      "type": "string"
-                    },
-                    "user_id": {
-                      "description": "The user id value.",
-                      "nullable": true,
-                      "type": "integer"
-                    }
-                  },
-                  "required": [
-                    "color",
-                    "created_at",
-                    "id",
-                    "name",
-                    "updated_at"
-                  ],
-                  "type": "object"
-                },
-                "type": "array"
-              },
               "portal_org_shared": {
                 "description": "The portal org shared value.",
                 "type": "boolean"
@@ -57134,50 +56378,6 @@
                 "description": "The parent workspace item number value.",
                 "nullable": true,
                 "type": "integer"
-              },
-              "personal_labels": {
-                "description": "The personal labels value.",
-                "items": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "color": {
-                      "description": "The color value.",
-                      "type": "string"
-                    },
-                    "created_at": {
-                      "description": "The created at value.",
-                      "format": "date-time",
-                      "type": "string"
-                    },
-                    "id": {
-                      "description": "The id value.",
-                      "type": "integer"
-                    },
-                    "name": {
-                      "description": "The name value.",
-                      "type": "string"
-                    },
-                    "updated_at": {
-                      "description": "The updated at value.",
-                      "format": "date-time",
-                      "type": "string"
-                    },
-                    "user_id": {
-                      "description": "The user id value.",
-                      "nullable": true,
-                      "type": "integer"
-                    }
-                  },
-                  "required": [
-                    "color",
-                    "created_at",
-                    "id",
-                    "name",
-                    "updated_at"
-                  ],
-                  "type": "object"
-                },
-                "type": "array"
               },
               "portal_org_shared": {
                 "description": "The portal org shared value.",
@@ -62688,49 +61888,6 @@
           "id",
           "status",
           "you_can_decide"
-        ],
-        "type": "object"
-      },
-      "PersonalLabel": {
-        "additionalProperties": false,
-        "description": "A user-owned label attached to a personal task.",
-        "properties": {
-          "color": {
-            "description": "Display color.",
-            "type": "string"
-          },
-          "created_at": {
-            "description": "Creation timestamp.",
-            "format": "date-time",
-            "type": "string"
-          },
-          "id": {
-            "description": "Label identifier.",
-            "minimum": 1,
-            "type": "integer"
-          },
-          "name": {
-            "description": "Label name.",
-            "type": "string"
-          },
-          "updated_at": {
-            "description": "Last update timestamp.",
-            "format": "date-time",
-            "type": "string"
-          },
-          "user_id": {
-            "description": "Owning user; null for a global personal label.",
-            "minimum": 1,
-            "nullable": true,
-            "type": "integer"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "color",
-          "created_at",
-          "updated_at"
         ],
         "type": "object"
       },
@@ -71983,50 +71140,6 @@
                         "nullable": true,
                         "type": "integer"
                       },
-                      "personal_labels": {
-                        "description": "The personal labels value.",
-                        "items": {
-                          "additionalProperties": false,
-                          "properties": {
-                            "color": {
-                              "description": "The color value.",
-                              "type": "string"
-                            },
-                            "created_at": {
-                              "description": "The created at value.",
-                              "format": "date-time",
-                              "type": "string"
-                            },
-                            "id": {
-                              "description": "The id value.",
-                              "type": "integer"
-                            },
-                            "name": {
-                              "description": "The name value.",
-                              "type": "string"
-                            },
-                            "updated_at": {
-                              "description": "The updated at value.",
-                              "format": "date-time",
-                              "type": "string"
-                            },
-                            "user_id": {
-                              "description": "The user id value.",
-                              "nullable": true,
-                              "type": "integer"
-                            }
-                          },
-                          "required": [
-                            "color",
-                            "created_at",
-                            "id",
-                            "name",
-                            "updated_at"
-                          ],
-                          "type": "object"
-                        },
-                        "type": "array"
-                      },
                       "portal_org_shared": {
                         "description": "The portal org shared value.",
                         "type": "boolean"
@@ -73052,50 +72165,6 @@
                   "description": "The parent workspace item number value.",
                   "nullable": true,
                   "type": "integer"
-                },
-                "personal_labels": {
-                  "description": "The personal labels value.",
-                  "items": {
-                    "additionalProperties": false,
-                    "properties": {
-                      "color": {
-                        "description": "The color value.",
-                        "type": "string"
-                      },
-                      "created_at": {
-                        "description": "The created at value.",
-                        "format": "date-time",
-                        "type": "string"
-                      },
-                      "id": {
-                        "description": "The id value.",
-                        "type": "integer"
-                      },
-                      "name": {
-                        "description": "The name value.",
-                        "type": "string"
-                      },
-                      "updated_at": {
-                        "description": "The updated at value.",
-                        "format": "date-time",
-                        "type": "string"
-                      },
-                      "user_id": {
-                        "description": "The user id value.",
-                        "nullable": true,
-                        "type": "integer"
-                      }
-                    },
-                    "required": [
-                      "color",
-                      "created_at",
-                      "id",
-                      "name",
-                      "updated_at"
-                    ],
-                    "type": "object"
-                  },
-                  "type": "array"
                 },
                 "portal_org_shared": {
                   "description": "The portal org shared value.",
@@ -74212,50 +73281,6 @@
                       "description": "The parent workspace item number value.",
                       "nullable": true,
                       "type": "integer"
-                    },
-                    "personal_labels": {
-                      "description": "The personal labels value.",
-                      "items": {
-                        "additionalProperties": false,
-                        "properties": {
-                          "color": {
-                            "description": "The color value.",
-                            "type": "string"
-                          },
-                          "created_at": {
-                            "description": "The created at value.",
-                            "format": "date-time",
-                            "type": "string"
-                          },
-                          "id": {
-                            "description": "The id value.",
-                            "type": "integer"
-                          },
-                          "name": {
-                            "description": "The name value.",
-                            "type": "string"
-                          },
-                          "updated_at": {
-                            "description": "The updated at value.",
-                            "format": "date-time",
-                            "type": "string"
-                          },
-                          "user_id": {
-                            "description": "The user id value.",
-                            "nullable": true,
-                            "type": "integer"
-                          }
-                        },
-                        "required": [
-                          "color",
-                          "created_at",
-                          "id",
-                          "name",
-                          "updated_at"
-                        ],
-                        "type": "object"
-                      },
-                      "type": "array"
                     },
                     "portal_org_shared": {
                       "description": "The portal org shared value.",
@@ -75394,50 +74419,6 @@
                       "description": "The parent workspace item number value.",
                       "nullable": true,
                       "type": "integer"
-                    },
-                    "personal_labels": {
-                      "description": "The personal labels value.",
-                      "items": {
-                        "additionalProperties": false,
-                        "properties": {
-                          "color": {
-                            "description": "The color value.",
-                            "type": "string"
-                          },
-                          "created_at": {
-                            "description": "The created at value.",
-                            "format": "date-time",
-                            "type": "string"
-                          },
-                          "id": {
-                            "description": "The id value.",
-                            "type": "integer"
-                          },
-                          "name": {
-                            "description": "The name value.",
-                            "type": "string"
-                          },
-                          "updated_at": {
-                            "description": "The updated at value.",
-                            "format": "date-time",
-                            "type": "string"
-                          },
-                          "user_id": {
-                            "description": "The user id value.",
-                            "nullable": true,
-                            "type": "integer"
-                          }
-                        },
-                        "required": [
-                          "color",
-                          "created_at",
-                          "id",
-                          "name",
-                          "updated_at"
-                        ],
-                        "type": "object"
-                      },
-                      "type": "array"
                     },
                     "portal_org_shared": {
                       "description": "The portal org shared value.",
@@ -76597,50 +75578,6 @@
                 "nullable": true,
                 "type": "integer"
               },
-              "personal_labels": {
-                "description": "The personal labels value.",
-                "items": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "color": {
-                      "description": "The color value.",
-                      "type": "string"
-                    },
-                    "created_at": {
-                      "description": "The created at value.",
-                      "format": "date-time",
-                      "type": "string"
-                    },
-                    "id": {
-                      "description": "The id value.",
-                      "type": "integer"
-                    },
-                    "name": {
-                      "description": "The name value.",
-                      "type": "string"
-                    },
-                    "updated_at": {
-                      "description": "The updated at value.",
-                      "format": "date-time",
-                      "type": "string"
-                    },
-                    "user_id": {
-                      "description": "The user id value.",
-                      "nullable": true,
-                      "type": "integer"
-                    }
-                  },
-                  "required": [
-                    "color",
-                    "created_at",
-                    "id",
-                    "name",
-                    "updated_at"
-                  ],
-                  "type": "object"
-                },
-                "type": "array"
-              },
               "portal_org_shared": {
                 "description": "The portal org shared value.",
                 "type": "boolean"
@@ -77779,50 +76716,6 @@
                 "description": "The parent workspace item number value.",
                 "nullable": true,
                 "type": "integer"
-              },
-              "personal_labels": {
-                "description": "The personal labels value.",
-                "items": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "color": {
-                      "description": "The color value.",
-                      "type": "string"
-                    },
-                    "created_at": {
-                      "description": "The created at value.",
-                      "format": "date-time",
-                      "type": "string"
-                    },
-                    "id": {
-                      "description": "The id value.",
-                      "type": "integer"
-                    },
-                    "name": {
-                      "description": "The name value.",
-                      "type": "string"
-                    },
-                    "updated_at": {
-                      "description": "The updated at value.",
-                      "format": "date-time",
-                      "type": "string"
-                    },
-                    "user_id": {
-                      "description": "The user id value.",
-                      "nullable": true,
-                      "type": "integer"
-                    }
-                  },
-                  "required": [
-                    "color",
-                    "created_at",
-                    "id",
-                    "name",
-                    "updated_at"
-                  ],
-                  "type": "object"
-                },
-                "type": "array"
               },
               "portal_org_shared": {
                 "description": "The portal org shared value.",
@@ -79352,50 +78245,6 @@
                     "description": "The parent workspace item number value.",
                     "nullable": true,
                     "type": "integer"
-                  },
-                  "personal_labels": {
-                    "description": "The personal labels value.",
-                    "items": {
-                      "additionalProperties": false,
-                      "properties": {
-                        "color": {
-                          "description": "The color value.",
-                          "type": "string"
-                        },
-                        "created_at": {
-                          "description": "The created at value.",
-                          "format": "date-time",
-                          "type": "string"
-                        },
-                        "id": {
-                          "description": "The id value.",
-                          "type": "integer"
-                        },
-                        "name": {
-                          "description": "The name value.",
-                          "type": "string"
-                        },
-                        "updated_at": {
-                          "description": "The updated at value.",
-                          "format": "date-time",
-                          "type": "string"
-                        },
-                        "user_id": {
-                          "description": "The user id value.",
-                          "nullable": true,
-                          "type": "integer"
-                        }
-                      },
-                      "required": [
-                        "color",
-                        "created_at",
-                        "id",
-                        "name",
-                        "updated_at"
-                      ],
-                      "type": "object"
-                    },
-                    "type": "array"
                   },
                   "portal_org_shared": {
                     "description": "The portal org shared value.",
@@ -81082,50 +79931,6 @@
                     "nullable": true,
                     "type": "integer"
                   },
-                  "personal_labels": {
-                    "description": "The personal labels value.",
-                    "items": {
-                      "additionalProperties": false,
-                      "properties": {
-                        "color": {
-                          "description": "The color value.",
-                          "type": "string"
-                        },
-                        "created_at": {
-                          "description": "The created at value.",
-                          "format": "date-time",
-                          "type": "string"
-                        },
-                        "id": {
-                          "description": "The id value.",
-                          "type": "integer"
-                        },
-                        "name": {
-                          "description": "The name value.",
-                          "type": "string"
-                        },
-                        "updated_at": {
-                          "description": "The updated at value.",
-                          "format": "date-time",
-                          "type": "string"
-                        },
-                        "user_id": {
-                          "description": "The user id value.",
-                          "nullable": true,
-                          "type": "integer"
-                        }
-                      },
-                      "required": [
-                        "color",
-                        "created_at",
-                        "id",
-                        "name",
-                        "updated_at"
-                      ],
-                      "type": "object"
-                    },
-                    "type": "array"
-                  },
                   "portal_org_shared": {
                     "description": "The portal org shared value.",
                     "type": "boolean"
@@ -82276,50 +81081,6 @@
                 "nullable": true,
                 "type": "integer"
               },
-              "personal_labels": {
-                "description": "The personal labels value.",
-                "items": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "color": {
-                      "description": "The color value.",
-                      "type": "string"
-                    },
-                    "created_at": {
-                      "description": "The created at value.",
-                      "format": "date-time",
-                      "type": "string"
-                    },
-                    "id": {
-                      "description": "The id value.",
-                      "type": "integer"
-                    },
-                    "name": {
-                      "description": "The name value.",
-                      "type": "string"
-                    },
-                    "updated_at": {
-                      "description": "The updated at value.",
-                      "format": "date-time",
-                      "type": "string"
-                    },
-                    "user_id": {
-                      "description": "The user id value.",
-                      "nullable": true,
-                      "type": "integer"
-                    }
-                  },
-                  "required": [
-                    "color",
-                    "created_at",
-                    "id",
-                    "name",
-                    "updated_at"
-                  ],
-                  "type": "object"
-                },
-                "type": "array"
-              },
               "portal_org_shared": {
                 "description": "The portal org shared value.",
                 "type": "boolean"
@@ -83413,50 +82174,6 @@
                       "description": "The parent workspace item number value.",
                       "nullable": true,
                       "type": "integer"
-                    },
-                    "personal_labels": {
-                      "description": "The personal labels value.",
-                      "items": {
-                        "additionalProperties": false,
-                        "properties": {
-                          "color": {
-                            "description": "The color value.",
-                            "type": "string"
-                          },
-                          "created_at": {
-                            "description": "The created at value.",
-                            "format": "date-time",
-                            "type": "string"
-                          },
-                          "id": {
-                            "description": "The id value.",
-                            "type": "integer"
-                          },
-                          "name": {
-                            "description": "The name value.",
-                            "type": "string"
-                          },
-                          "updated_at": {
-                            "description": "The updated at value.",
-                            "format": "date-time",
-                            "type": "string"
-                          },
-                          "user_id": {
-                            "description": "The user id value.",
-                            "nullable": true,
-                            "type": "integer"
-                          }
-                        },
-                        "required": [
-                          "color",
-                          "created_at",
-                          "id",
-                          "name",
-                          "updated_at"
-                        ],
-                        "type": "object"
-                      },
-                      "type": "array"
                     },
                     "portal_org_shared": {
                       "description": "The portal org shared value.",

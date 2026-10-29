@@ -138,24 +138,6 @@ export default {
     connectedAccountsTab: 'Comptes',
     connectedAccountsDesc:
       'Connectez vos comptes de gestion de code source pour créer des branches et des pull requests',
-    labels: {
-      tabLabel: 'Étiquettes personnelles',
-      tabDescription: 'Gérer vos étiquettes personnelles.',
-      searchPlaceholder: 'Rechercher des étiquettes',
-      new: 'Nouvelle étiquette',
-      createTitle: 'Créer une étiquette',
-      editTitle: 'Modifier l’étiquette',
-      namePlaceholder: 'ex. urgent',
-      mine: 'Mes étiquettes',
-      empty: 'Aucune étiquette pour le moment',
-      emptyHint: 'Créez votre première étiquette pour organiser vos éléments.',
-      created: 'Étiquette créée',
-      updated: 'Étiquette mise à jour',
-      deleted: 'Étiquette supprimée',
-      deleteTitle: 'Supprimer l’étiquette ?',
-      deleteMessage:
-        'Supprimer « {name} » ? Cela la retirera de tous les éléments auxquels elle est associée.',
-    },
     agents: {
       title: 'Agents',
       description:

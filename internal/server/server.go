@@ -837,7 +837,6 @@ func (s *Server) initialize() error {
 	iterationTypeHandler := handlers.NewEnumHandler(
 		services.NewEnumService(s.db, iterationTypeConfig),
 		func() any { return &models.IterationType{} }).WithGlobalMutationPermission(permService, models.PermissionIterationManage)
-	personalLabelHandler := handlers.NewPersonalLabelHandler(s.db, permService)
 	reviewHandler := handlers.NewReviewHandler(s.db, permService)
 	calendarFeedHandler := handlers.NewCalendarFeedHandler(s.db, permService, cfg.BaseURL)
 	securitySettingsHandler := handlers.NewSecuritySettingsHandler(repository.NewSystemSettingRepository(s.db), logger.NewAuditor(s.db), cfg.Plugins.Disabled)
@@ -1793,7 +1792,6 @@ func (s *Server) initialize() error {
 		Planning: routes.PlanningHandlers{
 			MilestoneCategory: milestoneCategoryHandler,
 			IterationType:     iterationTypeHandler,
-			PersonalLabel:     personalLabelHandler,
 		},
 		TimeTracking: routes.TimeTrackingHandlers{
 			Customer:           timeCustomerHandler,

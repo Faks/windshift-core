@@ -6,13 +6,11 @@
 	import GitBranch from '@lucide/svelte/icons/git-branch';
 	import Globe from '@lucide/svelte/icons/globe';
 	import Plane from '@lucide/svelte/icons/plane';
-	import Tag from '@lucide/svelte/icons/tag';
 	import User from '@lucide/svelte/icons/user';
 	import { getUser } from '../api/users.js';
 	import AlertBox from '../components/AlertBox.svelte';
 	import Badge from '../components/Badge.svelte';
 	import Tabs from '../components/Tabs.svelte';
-	import PersonalLabelManager from '../features/labels/PersonalLabelManager.svelte';
 	import PageHeader from '../layout/PageHeader.svelte';
 	import LeavePeriods from '../profile/LeavePeriods.svelte';
 	import ProfileAgentsTab from '../profile/ProfileAgentsTab.svelte';
@@ -50,12 +48,6 @@
 			testid: 'profile-tab-agents'
 		},
 		{ id: 'connected-accounts', label: t('users.connectedAccountsTab'), icon: GitBranch },
-		{
-			id: 'labels',
-			label: t('users.labels.tabLabel') || 'Personal labels',
-			icon: Tag,
-			testid: 'profile-tab-labels'
-		},
 		{ id: 'calendar-integration', label: t('users.calendarIntegration'), icon: CalendarDays },
 		{ id: 'leave', label: t('profile.leave.tabLabel'), icon: Plane }
 	]);
@@ -187,17 +179,6 @@
 				</p>
 			</div>
 			<ConnectedAccountsTab />
-		{:else if activeTab === 'labels'}
-			<div class="mb-6">
-				<h2 class="text-lg font-medium flex items-center gap-2" style="color: var(--ds-text);">
-					<Tag class="h-5 w-5" style="color: var(--ds-text-subtle);" />
-					{t('users.labels.tabLabel')}
-				</h2>
-				<p class="text-sm" style="color: var(--ds-text-subtle);">
-					{t('users.labels.tabDescription')}
-				</p>
-			</div>
-			<PersonalLabelManager />
 		{:else if activeTab === 'leave'}
 			<LeavePeriods />
 		{/if}

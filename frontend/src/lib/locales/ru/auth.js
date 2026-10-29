@@ -134,24 +134,6 @@ export default {
     connectedAccountsTab: 'Учётные записи',
     connectedAccountsDesc:
       'Подключите учётную запись GitHub, GitLab или другого Git-сервиса, чтобы создавать ветки и запросы на слияние',
-    labels: {
-      tabLabel: 'Метки',
-      tabDescription: 'Личные метки для ваших рабочих элементов',
-      searchPlaceholder: 'Поиск меток',
-      new: 'Новая метка',
-      createTitle: 'Создать метку',
-      editTitle: 'Изменить метку',
-      namePlaceholder: 'Например, срочно',
-      mine: 'Мои метки',
-      empty: 'Меток пока нет',
-      emptyHint: 'Создайте первую метку, чтобы упорядочить элементы.',
-      created: 'Метка создана',
-      updated: 'Метка обновлена',
-      deleted: 'Метка удалена',
-      deleteTitle: 'Удалить метку?',
-      deleteMessage:
-        'Удалить метку «{name}»? Она будет удалена со всех связанных элементов.',
-    },
     agents: {
       title: 'Агенты',
       description:

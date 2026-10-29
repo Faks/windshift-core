@@ -138,24 +138,6 @@ export default {
     connectedAccountsTab: 'Accounts',
     connectedAccountsDesc:
       'Connect your source control accounts to create branches and pull requests',
-    labels: {
-      tabLabel: 'Personal labels',
-      tabDescription: 'Manage your personal labels.',
-      searchPlaceholder: 'Search labels',
-      new: 'New label',
-      createTitle: 'Create label',
-      editTitle: 'Edit label',
-      namePlaceholder: 'e.g. urgent',
-      mine: 'My labels',
-      empty: 'No labels yet',
-      emptyHint: 'Create your first label to organize items.',
-      created: 'Label created',
-      updated: 'Label updated',
-      deleted: 'Label deleted',
-      deleteTitle: 'Delete label?',
-      deleteMessage:
-        'Delete "{name}"? This will remove it from any items it is attached to.',
-    },
     agents: {
       title: 'Agents',
       description:

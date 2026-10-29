@@ -162,7 +162,6 @@ type AdminHandlers struct {
 type PlanningHandlers struct {
 	MilestoneCategory *handlers.EnumHandler
 	IterationType     *handlers.EnumHandler
-	PersonalLabel     *handlers.PersonalLabelHandler
 }
 
 // TimeTrackingHandlers groups time tracking handlers.

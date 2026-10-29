@@ -1393,27 +1393,6 @@ var Catalog = []Migration{
 		`,
 	},
 	{
-		Version:       "20260918_personal_labels_unique_per_user",
-		Name:          "Scope personal label name uniqueness to the owning user",
-		CheckSQLite:   sqliteIndexCheck("uq_personal_labels_user_name"),
-		CheckPostgres: pgIndexCheck("uq_personal_labels_user_name"),
-		Postgres: `
-			ALTER TABLE personal_labels DROP CONSTRAINT IF EXISTS personal_labels_name_key;
-			CREATE UNIQUE INDEX IF NOT EXISTS uq_personal_labels_user_name
-				ON personal_labels(COALESCE(user_id, 0), name);
-		`,
-		// SQLite cannot drop the inline UNIQUE(name) without a table rebuild.
-		// The SQL field must stay non-empty: an empty body makes the runner
-		// stamp the row without reaching Check or ApplySQLite.
-		SQLite:      "applySQLitePersonalLabelsPerUserUnique:v1",
-		ApplySQLite: applySQLitePersonalLabelsPerUserUnique,
-		// Databases stamped while the SQLite field was empty carry the
-		// empty-body checksum (sha256 of ""); advance them to the marker
-		// checksum. Their rebuild still requires re-running the migration,
-		// which the runner does not do for stamped rows.
-		Superseded: []string{"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
-	},
-	{
 		Version:       "20260918_kb_events",
 		Name:          "Add portal knowledge-base usage-signal event log",
 		CheckSQLite:   sqliteTableCheck("kb_events"),
@@ -3048,6 +3027,22 @@ var Catalog = []Migration{
 			ALTER TABLE user_preferences ADD COLUMN due_date_reminder_days INTEGER NOT NULL DEFAULT 3;
 		`,
 	},
+	{
+		Version: "20261115_remove_personal_labels",
+		Name:    "Remove the unused personal labels feature",
+		// Effect present when neither table exists, which is also true on fresh
+		// installs (the tables are gone from the schema).
+		CheckSQLite:   "SELECT CASE WHEN (SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('personal_labels','personal_item_labels')) = 0 THEN 1 ELSE 0 END",
+		CheckPostgres: "SELECT CASE WHEN (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=current_schema() AND table_name IN ('personal_labels','personal_item_labels')) = 0 THEN 1 ELSE 0 END",
+		SQLite: `
+			DROP TABLE IF EXISTS personal_item_labels;
+			DROP TABLE IF EXISTS personal_labels;
+		`,
+		Postgres: `
+			DROP TABLE IF EXISTS personal_item_labels;
+			DROP TABLE IF EXISTS personal_labels;
+		`,
+	},
 }
 
 // applyAssetReportsWorkspacePinned backfills form-mode asset reports that have
@@ -3629,73 +3624,6 @@ func applyViewSettingsToolsBackfill(db Database) error {
 	return nil
 }
 
-func applySQLitePersonalLabelsPerUserUnique(db Database) (retErr error) {
-	sqliteDB, ok := db.(*SQLiteDB)
-	if !ok {
-		return fmt.Errorf("expected SQLite database, got %T", db)
-	}
-
-	ctx := context.Background()
-	conn, err := sqliteDB.writeConn.Conn(ctx)
-	if err != nil {
-		return fmt.Errorf("acquire SQLite write connection: %w", err)
-	}
-	defer func() { _ = conn.Close() }()
-
-	var foreignKeysEnabled bool
-	if err := conn.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&foreignKeysEnabled); err != nil {
-		return fmt.Errorf("read foreign_keys pragma: %w", err)
-	}
-	if foreignKeysEnabled {
-		if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=OFF"); err != nil {
-			return fmt.Errorf("disable foreign keys: %w", err)
-		}
-		defer func() {
-			if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=ON"); retErr == nil && err != nil {
-				retErr = fmt.Errorf("restore foreign keys: %w", err)
-			}
-		}()
-	}
-
-	tx, err := conn.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin personal_labels rebuild: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	statements := []string{
-		`CREATE TABLE personal_labels_migration (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name TEXT NOT NULL,
-			color TEXT DEFAULT '#3B82F6',
-			user_id INTEGER,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-		)`,
-		`INSERT INTO personal_labels_migration (id, name, color, user_id, created_at, updated_at)
-			SELECT id, name, color, user_id, created_at, updated_at FROM personal_labels`,
-		`DROP TABLE personal_labels`,
-		`ALTER TABLE personal_labels_migration RENAME TO personal_labels`,
-		`CREATE INDEX idx_personal_labels_user_id ON personal_labels(user_id)`,
-		`CREATE UNIQUE INDEX uq_personal_labels_user_name ON personal_labels(COALESCE(user_id, 0), name)`,
-	}
-	for _, statement := range statements {
-		if _, err := tx.ExecContext(ctx, statement); err != nil {
-			return fmt.Errorf("rebuild personal_labels: %w", err)
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit personal_labels rebuild: %w", err)
-	}
-
-	return nil
-}
-
-// applySQLiteEmailReplyOutboxPerRecipient rebuilds email_reply_outbox without
-// the inline UNIQUE(comment_id) constraint and adds the per-recipient unique
-// index (WI-1136). SQLite cannot drop the constraint in place.
 func applySQLiteEmailReplyOutboxPerRecipient(db Database) (retErr error) {
 	sqliteDB, ok := db.(*SQLiteDB)
 	if !ok {
