@@ -27972,6 +27972,62 @@
         ],
         "type": "object"
       },
+      "GetPagesSummariesResult": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "depth": {
+                  "description": "The depth value.",
+                  "type": "integer"
+                },
+                "is_home": {
+                  "description": "The is home value.",
+                  "type": "boolean"
+                },
+                "page_id": {
+                  "description": "The page id value.",
+                  "type": "integer"
+                },
+                "parent_id": {
+                  "description": "The parent id value.",
+                  "nullable": true,
+                  "type": "integer"
+                },
+                "title": {
+                  "description": "The title value.",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "description": "The updated at value.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "workspace_id": {
+                  "description": "The workspace id value.",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "depth",
+                "is_home",
+                "page_id",
+                "title",
+                "updated_at",
+                "workspace_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "GetPagesTitlesResult": {
         "additionalProperties": false,
         "properties": {
@@ -113369,6 +113425,83 @@
         ],
         "x-required-scopes": [
           "workspaces:read"
+        ]
+      }
+    },
+    "/pages/summaries": {
+      "get": {
+        "description": "List page summaries across workspaces. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "operationId": "getPagesSummaries",
+        "parameters": [
+          {
+            "description": "Comma-separated workspace IDs to include. At most 50 IDs are accepted.",
+            "in": "query",
+            "name": "workspace_ids",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Page title and content search text; omit to list every visible page.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of search matches.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 12,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetPagesSummariesResult"
+                }
+              }
+            },
+            "description": "List page summaries across workspaces response."
+          },
+          "400": {
+            "$ref": "#/components/responses/InvalidRequestError"
+          },
+          "401": {
+            "$ref": "#/components/responses/AuthenticationError"
+          },
+          "403": {
+            "$ref": "#/components/responses/PermissionError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "List page summaries across workspaces",
+        "tags": [
+          "Knowledge"
+        ],
+        "x-required-scopes": [
+          "pages:read"
         ]
       }
     },

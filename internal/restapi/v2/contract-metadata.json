@@ -8667,6 +8667,54 @@
         ]
       }
     },
+    "/pages/summaries": {
+      "get": {
+        "description": "List page summaries across workspaces. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",
+        "parameters": [
+          {
+            "Name": "workspace_ids",
+            "In": "query",
+            "Description": "Comma-separated workspace IDs to include. At most 50 IDs are accepted.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "q",
+            "In": "query",
+            "Description": "Page title and content search text; omit to list every visible page.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "limit",
+            "In": "query",
+            "Description": "Maximum number of search matches.",
+            "Required": false,
+            "Schema": {
+              "default": 12,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "List page summaries across workspaces",
+        "tags": [
+          "Knowledge"
+        ]
+      }
+    },
     "/pages/titles": {
       "get": {
         "description": "List page titles across workspaces. Results include only resources visible to the authenticated caller; collections use their documented stable order and bounds.",

@@ -396,6 +396,7 @@ type pageReader interface {
 type pageApplication interface {
 	List(int, int) ([]models.Page, error)
 	ListTitlesAcrossWorkspaces(int, []int) ([]services.PageTitleRow, error)
+	ListSummariesAcrossWorkspaces(int, []int, string, int) ([]services.PageSummaryRow, error)
 	EffectiveLevels(int, int) (map[int]string, error)
 	Get(int, int, int) (*models.Page, error)
 	Search(int, int, string, int) ([]models.Page, error)
