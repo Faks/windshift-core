@@ -220,6 +220,13 @@ export const labels = {
       method: 'PUT',
       body: JSON.stringify({ label_ids: labelIds }),
     }),
+  // Apply one add/remove delta to many items in a single server-side request.
+  // Returns per-item failures instead of fanning out one PUT per item.
+  bulkSetLabels: (itemIds, { add = [], remove = [] } = {}) =>
+    fetchV2Data('/items/bulk-labels', {
+      method: 'POST',
+      body: JSON.stringify({ item_ids: itemIds, add, remove }),
+    }),
 };
 
 // Jira Cloud Import

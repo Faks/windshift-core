@@ -1654,8 +1654,8 @@
     bulkLabelsModalOpen = true;
   }
 
-  // Labels are a join table with no bulk endpoint, so v1 applies them one item
-  // at a time and reports a combined result.
+  // Labels are a join table, so the board sends the add/remove delta for the
+  // whole selection in one request instead of one PUT per item.
   async function applyBulkLabels() {
     if (bulkBusy) return;
     const targets = selectedItems;
@@ -1666,32 +1666,29 @@
     bulkLabelsModalOpen = false;
     if (added.length === 0 && removed.length === 0) return;
     bulkBusy = true;
-    let updated = 0;
-    let failed = 0;
-    for (const item of targets) {
-      const current = itemLabelIds(item);
-      const next = [
-        ...new Set([...current.filter((id) => !removed.includes(id)), ...added]),
-      ];
-      try {
-        await labelsApi.setForItem(item.id, next);
-        updated += 1;
-      } catch (error) {
-        console.error('Bulk label update failed:', error);
-        failed += 1;
+    try {
+      const result = await labelsApi.bulkSetLabels(
+        targets.map((item) => item.id),
+        { add: added, remove: removed }
+      );
+      const updated = result?.updated_count ?? 0;
+      const failed = result?.failed_count ?? 0;
+      if (failed > 0) {
+        warningToast(t('collections.bulkLabelPartial', { count: updated, failed }));
+      } else {
+        successToast(t('collections.bulkLabelSuccess', { count: updated }));
       }
+    } catch (error) {
+      console.error('Bulk label update failed:', error);
+      warningToast(error?.message || t('collections.bulkUpdateFailed'));
+    } finally {
+      bulkBusy = false;
+      clearSelection();
+      // Keep the shared label directory in sync so newly created labels appear
+      // on cards and in other pickers.
+      void workspaceDataStore.invalidate('labels');
+      reloadCollection();
     }
-    if (failed > 0) {
-      warningToast(t('collections.bulkLabelPartial', { count: updated, failed }));
-    } else {
-      successToast(t('collections.bulkLabelSuccess', { count: updated }));
-    }
-    bulkBusy = false;
-    clearSelection();
-    // Keep the shared label directory in sync so newly created labels appear
-    // on cards and in other pickers.
-    void workspaceDataStore.invalidate('labels');
-    reloadCollection();
   }
 
   async function ensureAssignableUsers() {

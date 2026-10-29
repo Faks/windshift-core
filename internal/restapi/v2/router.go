@@ -344,6 +344,7 @@ type labelApplication interface {
 	SetForItem(services.AuditActor, int, []int) ([]models.Label, error)
 	AddToItem(services.AuditActor, int, int) ([]models.Label, error)
 	RemoveFromItem(services.AuditActor, int, int) error
+	BulkApply(services.AuditActor, services.BulkLabelOperation, func(int) (bool, error)) (services.BulkLabelResult, error)
 }
 
 type participantApplication interface {

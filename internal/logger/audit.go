@@ -582,6 +582,7 @@ const (
 	ActionItemSplit          = "item.split"
 	ActionItemBulkUpdate     = "item.bulk_update"
 	ActionItemBulkTransition = "item.bulk_transition"
+	ActionItemBulkLabels     = "item.bulk_labels"
 	ActionCommentDelete      = "comment.delete"
 	ActionCommentCreate      = "comment.create"
 	ActionAttachmentDelete   = "attachment.delete"

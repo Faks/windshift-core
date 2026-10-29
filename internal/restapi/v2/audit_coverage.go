@@ -179,6 +179,7 @@ var auditSpecRegistry = map[string]AuditKind{
 	"postItemsBatch":                                               AuditService,
 	"postItemsBatchAncestors":                                      AuditExempt, // read-only batch ancestor lookup
 	"postItemsBulkDelete":                                          AuditService,
+	"postItemsBulkLabels":                                          AuditService,
 	"postItemsBulkPatch":                                           AuditService,
 	"postItemsBulkTransition":                                      AuditService,
 	"postItemsBulkUpdate":                                          AuditService,

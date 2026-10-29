@@ -5283,6 +5283,25 @@
         ]
       }
     },
+    "/items/bulk-labels": {
+      "post": {
+        "description": "Bulk update item labels. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
+        "parameters": [],
+        "responses": {
+          "400": {},
+          "401": {},
+          "403": {},
+          "413": {},
+          "415": {},
+          "429": {},
+          "500": {}
+        },
+        "summary": "Bulk update item labels",
+        "tags": [
+          "Work items"
+        ]
+      }
+    },
     "/items/bulk-patch": {
       "post": {
         "description": "Bulk patch items. The server validates resource ownership and command preconditions before persisting changes. Unknown JSON fields are rejected when the operation accepts a body.",
