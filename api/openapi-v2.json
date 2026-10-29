@@ -30790,6 +30790,10 @@
                 "description": "The color mode value.",
                 "type": "string"
               },
+              "comment_sort_order": {
+                "description": "The comment sort order value.",
+                "type": "string"
+              },
               "due_date_reminder_days": {
                 "description": "The due date reminder days value.",
                 "type": "integer"
@@ -30932,6 +30936,7 @@
             },
             "required": [
               "color_mode",
+              "comment_sort_order",
               "due_date_reminder_days",
               "due_date_reminders_enabled",
               "saved_filters",
@@ -58261,6 +58266,11 @@
             "nullable": true,
             "type": "string"
           },
+          "comment_sort_order": {
+            "description": "The comment sort order value.",
+            "nullable": true,
+            "type": "string"
+          },
           "due_date_reminder_days": {
             "description": "The due date reminder days value.",
             "nullable": true,
@@ -58329,6 +58339,10 @@
             "properties": {
               "color_mode": {
                 "description": "The color mode value.",
+                "type": "string"
+              },
+              "comment_sort_order": {
+                "description": "The comment sort order value.",
                 "type": "string"
               },
               "due_date_reminder_days": {
@@ -58473,6 +58487,7 @@
             },
             "required": [
               "color_mode",
+              "comment_sort_order",
               "due_date_reminder_days",
               "due_date_reminders_enabled",
               "saved_filters",

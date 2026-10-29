@@ -119,6 +119,9 @@ type UserPreferencesData struct {
 	ViewState map[string]map[string]any `json:"view_state,omitempty"`
 	// SavedFilters holds the user's personal named filters keyed by scope id.
 	SavedFilters map[string]any `json:"saved_filters,omitempty"`
+	// CommentSortOrder is the user's preferred comment thread order, either
+	// "oldest" or "newest". Empty means the default (oldest first).
+	CommentSortOrder string `json:"comment_sort_order,omitempty"`
 }
 
 // UserTUIPreferences is the SSH TUI's persisted state sub-document. Pointer

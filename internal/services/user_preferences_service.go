@@ -22,10 +22,20 @@ var ErrPreferencesTooLarge = errors.New("user preferences exceed the storage lim
 // outside the supported range.
 var ErrInvalidReminderDays = errors.New("reminder days must be between 1 and 30")
 
+// ErrInvalidCommentSortOrder is returned when a preference update requests an
+// unsupported comment thread order.
+var ErrInvalidCommentSortOrder = errors.New("comment sort order must be oldest or newest")
+
 // MinReminderDays and MaxReminderDays bound the per-user reminder lead time.
 const (
 	MinReminderDays = 1
 	MaxReminderDays = 30
+)
+
+// Comment thread orders accepted by the preferences API.
+const (
+	CommentSortOldest = "oldest"
+	CommentSortNewest = "newest"
 )
 
 // maxPreferencesBytes bounds the serialized per-user preferences document.
@@ -44,6 +54,9 @@ type UserPreferencesSnapshot struct {
 	// for automatic reminders on their upcoming due items.
 	DueDateRemindersEnabled bool
 	DueDateReminderDays     int
+	// CommentSortOrder is the user's preferred comment thread order; always
+	// "oldest" or "newest".
+	CommentSortOrder string
 }
 
 type UserPreferencesPatch struct {
@@ -71,6 +84,9 @@ type UserPreferencesPatch struct {
 	DueDateRemindersEnabled    bool
 	DueDateReminderDaysSet     bool
 	DueDateReminderDays        int
+	// CommentSortOrderSet updates the user's preferred comment thread order.
+	CommentSortOrderSet bool
+	CommentSortOrder    string
 }
 
 // UserPreferencesService owns user preference use cases.
@@ -150,7 +166,15 @@ func (s *UserPreferencesService) GetSnapshot(userID int) (UserPreferencesSnapsho
 		SavedFilters:            prefs.SavedFilters,
 		DueDateRemindersEnabled: remindersEnabled,
 		DueDateReminderDays:     reminderDays,
+		CommentSortOrder:        normalizeCommentSortOrder(prefs.CommentSortOrder),
 	}, nil
+}
+
+func normalizeCommentSortOrder(order string) string {
+	if order == CommentSortNewest {
+		return CommentSortNewest
+	}
+	return CommentSortOldest
 }
 
 func (s *UserPreferencesService) UpdateSnapshot(userID int, patch UserPreferencesPatch) (UserPreferencesSnapshot, error) {
@@ -160,6 +184,12 @@ func (s *UserPreferencesService) UpdateSnapshot(userID int, patch UserPreference
 	}
 	if patch.DueDateReminderDaysSet && (patch.DueDateReminderDays < MinReminderDays || patch.DueDateReminderDays > MaxReminderDays) {
 		return UserPreferencesSnapshot{}, ErrInvalidReminderDays
+	}
+	if patch.CommentSortOrderSet && patch.CommentSortOrder != CommentSortOldest && patch.CommentSortOrder != CommentSortNewest {
+		return UserPreferencesSnapshot{}, ErrInvalidCommentSortOrder
+	}
+	if patch.CommentSortOrderSet {
+		prefs.CommentSortOrder = patch.CommentSortOrder
 	}
 	if patch.ColorModeSet {
 		if patch.ColorMode != "light" && patch.ColorMode != "dark" && patch.ColorMode != "system" {
