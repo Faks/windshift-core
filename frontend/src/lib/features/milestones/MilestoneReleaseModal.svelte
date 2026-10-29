@@ -13,7 +13,7 @@
   import DialogFooter from '../../dialogs/DialogFooter.svelte';
   import BasePicker from '../../pickers/BasePicker.svelte';
   import Tag from '@tabler/icons-svelte-runes/icons/tag';
-  import Sparkles from '@tabler/icons-svelte-runes/icons/sparkles';
+  import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
   import AlertBox from '../../components/AlertBox.svelte';
   import { createId } from '../../utils/uuid.js';
   import { loadMilestoneReleaseConnections } from './milestoneReleaseData.js';
@@ -349,7 +349,7 @@
             {#if generatingNotes}
               <Spinner size="sm" />
             {:else}
-              <Sparkles class="w-3 h-3" />
+              <IconMessageChatbot class="w-3 h-3" />
             {/if}
             <span>{generatingNotes ? 'Generating…' : 'Generate'}</span>
           </button>

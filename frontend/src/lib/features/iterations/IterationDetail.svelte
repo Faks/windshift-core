@@ -9,7 +9,7 @@
   import IconDots from '@tabler/icons-svelte-runes/icons/dots';
   import IconWorld from '@tabler/icons-svelte-runes/icons/world';
   import IconBuilding from '@tabler/icons-svelte-runes/icons/building';
-  import IconSparkles from '@tabler/icons-svelte-runes/icons/sparkles';
+  import IconMessageChatbot from '@tabler/icons-svelte-runes/icons/message-chatbot';
   import IconCircleCheck from '@tabler/icons-svelte-runes/icons/circle-check';
   import IterationBurndown from './IterationBurndown.svelte';
   import { iterations } from '../../api/milestones.js';
@@ -235,7 +235,7 @@
       items.push({
         id: 'dependencies',
         type: 'regular',
-        icon: IconSparkles,
+        icon: IconMessageChatbot,
         title: 'Analyze Dependencies',
         hoverClass: 'hover-bg',
         onClick: () => navigate(`/iterations/${iterationId}/dependencies`)
