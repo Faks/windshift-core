@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import StateDisplay from '../components/StateDisplay.svelte';
   import Bot from '@lucide/svelte/icons/bot';
-  import CheckSquare from '@lucide/svelte/icons/check-square';
+  import CheckSquare from '@lucide/svelte/icons/square-check';
   import Puzzle from '@lucide/svelte/icons/puzzle';
   import Upload from '@lucide/svelte/icons/upload';
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';

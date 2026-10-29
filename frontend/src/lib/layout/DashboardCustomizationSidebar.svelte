@@ -1,6 +1,6 @@
 <script>
   import Sparkles from '@lucide/svelte/icons/sparkles';
-  import CheckSquare from '@lucide/svelte/icons/check-square';
+  import CheckSquare from '@lucide/svelte/icons/square-check';
   import Compass from '@lucide/svelte/icons/compass';
   import LifeBuoy from '@lucide/svelte/icons/life-buoy';
   import Bell from '@lucide/svelte/icons/bell';

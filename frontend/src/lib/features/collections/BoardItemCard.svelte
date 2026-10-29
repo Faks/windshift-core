@@ -1,6 +1,6 @@
 <script>
   import CalendarDays from '@lucide/svelte/icons/calendar-days';
-  import CheckSquare from '@lucide/svelte/icons/check-square';
+  import CheckSquare from '@lucide/svelte/icons/square-check';
   import MoreHorizontal from '@lucide/svelte/icons/more-horizontal';
   import Square from '@lucide/svelte/icons/square';
   import Avatar from '../../components/Avatar.svelte';

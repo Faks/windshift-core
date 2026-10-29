@@ -15,7 +15,7 @@
   import Link2 from '@lucide/svelte/icons/link-2';
   import Mail from '@lucide/svelte/icons/mail';
   import ExternalLink from '@lucide/svelte/icons/external-link';
-  import CheckSquare from '@lucide/svelte/icons/check-square';
+  import CheckSquare from '@lucide/svelte/icons/square-check';
   import ColorDot from '../../components/ColorDot.svelte';
   import Checkbox from '../../components/Checkbox.svelte';
   import Input from '../../components/Input.svelte';
