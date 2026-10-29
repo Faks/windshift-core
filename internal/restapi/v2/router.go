@@ -20,6 +20,7 @@ import (
 	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/objecttranslation"
+	"windshift/internal/ratelimit"
 	"windshift/internal/repository"
 	"windshift/internal/services"
 	"windshift/internal/services/actioncatalog"
@@ -321,6 +322,14 @@ type csrfValidator interface {
 
 type concurrencyLimiter interface {
 	Acquire(int) (func(), bool)
+}
+
+// requestLimiter is the shared rate-limit engine. Satisfied by
+// *ratelimit.Limiter. v2 uses Decide rather than Limit so the 429 keeps the
+// v2 error envelope while still carrying the shared Retry-After and
+// X-RateLimit-* headers.
+type requestLimiter interface {
+	Decide(*http.Request) (ratelimit.Result, bool)
 }
 
 type objectLocalizer interface {
@@ -665,6 +674,9 @@ type Deps struct {
 	CORS                         Middleware
 	CSRF                         csrfValidator
 	Concurrency                  concurrencyLimiter
+	// RateLimiter is the per-user request-rate backstop for authenticated v2
+	// routes. Optional: nil leaves v2 unthrottled.
+	RateLimiter requestLimiter
 	// SLA serves the read-only item SLA state and compliance report. Optional:
 	// nil keeps the routes registered but answering not-found.
 	SLA *sla.Engine
@@ -1433,6 +1445,9 @@ func registerMount(mux *http.ServeMux, prefix string, routes []route, deps Deps,
 				}
 			}
 			if selected.Auth == AuthAuthenticated {
+				if deps.RateLimiter != nil {
+					handler = limitRequests(deps.RateLimiter)(handler)
+				}
 				if session {
 					handler = limitConcurrency(deps.Concurrency)(handler)
 					if deps.CSRF != nil && !isSafeMethod(selected.Method) {
@@ -1518,6 +1533,30 @@ func requireCSRF(validator csrfValidator) Middleware {
 		return func(w http.ResponseWriter, r *http.Request) error {
 			if !validator.Allows(r) {
 				return newError(http.StatusForbidden, "csrf_failed", "Cross-site request blocked")
+			}
+			return next(w, r)
+		}
+	}
+}
+
+// limitRequests enforces the shared rate-limit engine on a v2 handler chain.
+// The decision runs inside the auth middleware, so the user key is available.
+func limitRequests(limiter requestLimiter) Middleware {
+	return func(next Handler) Handler {
+		return func(w http.ResponseWriter, r *http.Request) error {
+			result, ok := limiter.Decide(r)
+			if !ok {
+				return next(w, r)
+			}
+			for name, values := range result.HeaderValues() {
+				for _, value := range values {
+					w.Header().Set(name, value)
+				}
+			}
+			if !result.Allowed {
+				apiErr := newError(http.StatusTooManyRequests, "rate_limited", "Rate limit exceeded")
+				apiErr.Headers = http.Header{"Retry-After": {strconv.Itoa(result.RetryAfterSeconds())}}
+				return apiErr
 			}
 			return next(w, r)
 		}

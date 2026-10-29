@@ -46,6 +46,7 @@ import (
 	"windshift/internal/objecttranslation"
 	"windshift/internal/plugins"
 	"windshift/internal/portalwebauthn"
+	"windshift/internal/ratelimit"
 	"windshift/internal/reporting"
 	"windshift/internal/repository"
 	"windshift/internal/restapi"
@@ -192,24 +193,26 @@ type Server struct {
 	memoryBudget        config.MemoryBudget
 	metrics             *appmetrics.Metrics
 
-	loginRateLimiter      *middleware.RateLimiter
-	runnerRegisterLimiter *middleware.RateLimiter
-	fidoRateLimiter       *middleware.RateLimiter
-	authRateLimiter       *middleware.RateLimiter
-	scimRateLimiter       *middleware.RateLimiter
-	portalSubmitLimiter   *middleware.RateLimiter
-	portalSearchLimiter   *middleware.RateLimiter
-	emailVerifyLimiter    *middleware.RateLimiter
-	setupLimiter          *middleware.RateLimiter
-	ssoRateLimiter        *middleware.RateLimiter
-	portalAuthLimiter     *middleware.RateLimiter
-	oauthTokenLimiter     *middleware.RateLimiter
-	aiRateLimiter         *middleware.RateLimiter
-	uploadLimiter         *middleware.RateLimiter
-	webhookLimiter        *middleware.RateLimiter
-	searchLimiter         *middleware.RateLimiter
-	calendarFeedLimiter   *middleware.RateLimiter
-	publicBoardLimiter    *middleware.RateLimiter
+	loginRateLimiter      *ratelimit.Limiter
+	runnerRegisterLimiter *ratelimit.Limiter
+	fidoRateLimiter       *ratelimit.Limiter
+	authRateLimiter       *ratelimit.Limiter
+	scimRateLimiter       *ratelimit.Limiter
+	portalSubmitLimiter   *ratelimit.Limiter
+	portalSearchLimiter   *ratelimit.Limiter
+	emailVerifyLimiter    *ratelimit.Limiter
+	setupLimiter          *ratelimit.Limiter
+	ssoRateLimiter        *ratelimit.Limiter
+	portalAuthLimiter     *ratelimit.Limiter
+	oauthTokenLimiter     *ratelimit.Limiter
+	aiRateLimiter         *ratelimit.Limiter
+	uploadLimiter         *ratelimit.Limiter
+	webhookLimiter        *ratelimit.Limiter
+	searchLimiter         *ratelimit.Limiter
+	calendarFeedLimiter   *ratelimit.Limiter
+	publicBoardLimiter    *ratelimit.Limiter
+	v2RateLimiter         *ratelimit.Limiter
+	loginLockout          *middleware.LoginLockout
 	userConcurrency       *middleware.UserConcurrencyLimiter
 
 	actualPort         int
@@ -408,37 +411,39 @@ func (s *Server) initialize() error {
 		return err
 	}
 
-	var userKeyedOpts []middleware.RateLimiterOption
-	userKeyedOpts = append(userKeyedOpts, middleware.WithUserKeyed())
+	// Core /api limiters. Authenticated surfaces key by user so a user's quota
+	// is shared across clients and tokens; unauthenticated surfaces key by IP.
+	// Public boards and OAuth /token stay IP-keyed even when DisableIPRateLimit
+	// is set, otherwise NAT deployments would lose brute-force protection.
+	ipKey := ratelimit.ByIP(ipExtractor)
+	userKey := ratelimit.ByUserOrIP(ipExtractor)
 	if cfg.DisableIPRateLimit {
-		userKeyedOpts = append(userKeyedOpts, middleware.WithDisableIPLimit())
+		userKey = ratelimit.ByUser()
 	}
 
-	s.loginRateLimiter = middleware.NewRateLimiter(5.0/60.0, 10, cfg.UseProxy, additionalProxyList)
-	s.runnerRegisterLimiter = middleware.NewRateLimiter(5.0/60.0, 10, cfg.UseProxy, additionalProxyList)
-	s.fidoRateLimiter = middleware.NewRateLimiter(10.0/60.0, 15, cfg.UseProxy, additionalProxyList)
-	s.scimRateLimiter = middleware.NewRateLimiter(10.0, 100, cfg.UseProxy, additionalProxyList)
-	s.portalSubmitLimiter = middleware.NewRateLimiter(5.0/60.0, 10, cfg.UseProxy, additionalProxyList)
-	s.portalSearchLimiter = middleware.NewRateLimiter(10.0/60.0, 15, cfg.UseProxy, additionalProxyList)
-	s.emailVerifyLimiter = middleware.NewRateLimiter(10.0/60.0, 15, cfg.UseProxy, additionalProxyList)
-	s.setupLimiter = middleware.NewRateLimiter(20.0/60.0, 30, cfg.UseProxy, additionalProxyList)
-	s.ssoRateLimiter = middleware.NewRateLimiter(10.0/60.0, 5, cfg.UseProxy, additionalProxyList)
-	s.portalAuthLimiter = middleware.NewRateLimiter(3.0/60.0, 3, cfg.UseProxy, additionalProxyList)
-	s.calendarFeedLimiter = middleware.NewRateLimiter(10.0/60.0, 15, cfg.UseProxy, additionalProxyList)
-	// Public boards are anonymous and can trigger substantial query and file IO.
-	// Keep this limiter IP-keyed even when authenticated IP limiting is disabled.
-	s.publicBoardLimiter = middleware.NewRateLimiter(30.0/60.0, 60, cfg.UseProxy, additionalProxyList)
-	// OAuth /token is unauthenticated (server-to-server), so it must stay
-	// IP-keyed and must NOT honor DisableIPRateLimit — otherwise enabling that
-	// flag for NAT deployments would silently remove all brute-force protection
-	// on client_secret/code guessing. Kept separate from the user-keyed
-	// authRateLimiter for exactly this reason.
-	s.oauthTokenLimiter = middleware.NewRateLimiter(20.0/60.0, 30, cfg.UseProxy, additionalProxyList)
-	s.authRateLimiter = middleware.NewRateLimiter(20.0/60.0, 30, cfg.UseProxy, additionalProxyList, userKeyedOpts...)
-	s.aiRateLimiter = middleware.NewRateLimiter(20.0/60.0, 30, cfg.UseProxy, additionalProxyList, userKeyedOpts...)
-	s.uploadLimiter = middleware.NewRateLimiter(10.0/60.0, 15, cfg.UseProxy, additionalProxyList, userKeyedOpts...)
-	s.webhookLimiter = middleware.NewRateLimiter(10.0/60.0, 15, cfg.UseProxy, additionalProxyList, userKeyedOpts...)
-	s.searchLimiter = middleware.NewRateLimiter(20.0/60.0, 30, cfg.UseProxy, additionalProxyList, userKeyedOpts...)
+	s.loginRateLimiter = ratelimit.New(5.0/60.0, 10, ipKey)
+	s.runnerRegisterLimiter = ratelimit.New(5.0/60.0, 10, ipKey)
+	s.fidoRateLimiter = ratelimit.New(10.0/60.0, 15, ipKey)
+	s.scimRateLimiter = ratelimit.New(10.0, 100, ipKey)
+	s.portalSubmitLimiter = ratelimit.New(5.0/60.0, 10, ipKey)
+	s.portalSearchLimiter = ratelimit.New(10.0/60.0, 15, ipKey)
+	s.emailVerifyLimiter = ratelimit.New(10.0/60.0, 15, ipKey)
+	s.setupLimiter = ratelimit.New(20.0/60.0, 30, ipKey)
+	s.ssoRateLimiter = ratelimit.New(10.0/60.0, 5, ipKey)
+	s.portalAuthLimiter = ratelimit.New(3.0/60.0, 3, ipKey)
+	s.calendarFeedLimiter = ratelimit.New(10.0/60.0, 15, ipKey)
+	s.publicBoardLimiter = ratelimit.New(30.0/60.0, 60, ipKey)
+	s.oauthTokenLimiter = ratelimit.New(20.0/60.0, 30, ipKey)
+	s.authRateLimiter = ratelimit.New(20.0/60.0, 30, userKey)
+	s.aiRateLimiter = ratelimit.New(20.0/60.0, 30, userKey)
+	s.uploadLimiter = ratelimit.New(10.0/60.0, 15, userKey)
+	s.webhookLimiter = ratelimit.New(10.0/60.0, 15, userKey)
+	s.searchLimiter = ratelimit.New(20.0/60.0, 30, userKey)
+	// Backstop for the v2 APIs, which previously had no request-rate limit at
+	// all. Generous enough not to interfere with normal SPA usage; the point is
+	// to stop runaway clients.
+	s.v2RateLimiter = ratelimit.New(100.0, 200, userKey)
+	s.loginLockout = middleware.NewLoginLockout()
 	// Per-user in-flight concurrency cap for the whole /api surface — bounds how
 	// many shared DB-pool connections one user can hold so a runaway client
 	// can't starve the others. Applied to the api group below.
@@ -861,7 +866,7 @@ func (s *Server) initialize() error {
 		repository.NewCredentialRepository(s.db),
 		logger.NewAuditor(s.db),
 		sessionManager,
-		s.loginRateLimiter,
+		s.loginLockout,
 		permService,
 		emailVerificationService,
 		ipExtractor,
@@ -2077,6 +2082,7 @@ func (s *Server) initialize() error {
 		CORS:                         v2.NewCORS(csrfOrigins, cfg.DisableCSRF, !cfg.DisableCSRF),
 		CSRF:                         v2CSRF,
 		Concurrency:                  s.userConcurrency,
+		RateLimiter:                  s.v2RateLimiter,
 	}); err != nil {
 		return fmt.Errorf("register REST API v2: %w", err)
 	}
@@ -2624,6 +2630,9 @@ func (s *Server) cleanup() {
 	}
 	if s.publicBoardLimiter != nil {
 		s.publicBoardLimiter.Stop()
+	}
+	if s.v2RateLimiter != nil {
+		s.v2RateLimiter.Stop()
 	}
 
 	// Stop notification manager (flush cached notifications to DB)

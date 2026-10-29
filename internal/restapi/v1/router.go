@@ -124,7 +124,7 @@ func RegisterRoutes(deps restapi.Deps) {
 		deprecationHeaders,
 		v1middleware.RequestID,
 		coremiddleware.LimitJSONRequestBody(restapi.DefaultJSONRequestBodyLimit),
-		rateLimiter.Middleware,
+		rateLimiter.Limit,
 	)
 	publicV1.Handle("GET /openapi.json", handlers.OpenAPISpecJSON)
 
@@ -135,7 +135,7 @@ func RegisterRoutes(deps restapi.Deps) {
 		v1middleware.RequestID,
 		coremiddleware.LimitJSONRequestBody(restapi.DefaultJSONRequestBodyLimit),
 		bearerAuth.RequireAuth,
-		rateLimiter.Middleware,
+		rateLimiter.Limit,
 	)
 
 	v1.HandleWithMiddleware("GET /items", itemHandler.List, bearerAuth.RequirePermission("items:read"))

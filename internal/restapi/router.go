@@ -90,7 +90,7 @@ type Deps struct {
 	// surface.
 	AI AIHandler
 	// AIRateLimiter bounds expensive AI calls, user-keyed. Satisfied by
-	// *middleware.RateLimiter (same import-cycle reasoning as AI). Optional:
+	// *ratelimit.Limiter (same import-cycle reasoning as AI). Optional:
 	// nil falls back to the group rate limiter alone.
 	AIRateLimiter Limiter
 	// IPExtractor resolves the client IP for the v1 IP-keyed rate-limit
@@ -105,8 +105,8 @@ type AIHandler interface {
 	GetDailyBriefing(w http.ResponseWriter, r *http.Request)
 }
 
-// Limiter wraps a request with a rate limit. Satisfied by the core
-// *middleware.RateLimiter.
+// Limiter wraps a request with a rate limit. Satisfied by the shared
+// *ratelimit.Limiter.
 type Limiter interface {
 	Limit(next http.Handler) http.Handler
 }
