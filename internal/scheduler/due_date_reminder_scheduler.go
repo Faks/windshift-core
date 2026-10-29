@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"windshift/internal/database"
-	"windshift/internal/models"
 	"windshift/internal/repository"
 	"windshift/internal/services"
 )
@@ -35,9 +34,11 @@ func DefaultDueDateReminderSchedulerConfig() DueDateReminderSchedulerConfig {
 // reminder is never automatic: only users who enabled due-date reminders in
 // their profile are notified, using their configured lead time. Assignees are
 // reminded for regular items; personal-workspace items without an assignee
-// remind their owner. Delivery is idempotent via a per-(item, user, due date)
-// ledger and a notification delivery key. Email rides the existing
-// notification email batching.
+// remind their owner. Notification creation goes through the shared direct
+// notification path, which re-checks recipient eligibility and workspace
+// permission and dedupes on the delivery key; a per-(item, user, due date)
+// ledger that outlives the notification row keeps a dismissed reminder from
+// being recreated. Email rides the existing notification email batching.
 type DueDateReminderScheduler struct {
 	db            database.Database
 	items         *repository.ItemRepository
@@ -110,9 +111,8 @@ func (s *DueDateReminderScheduler) RunOnce(ctx context.Context, now time.Time) {
 		return
 	}
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	// Query every opted-in recipient's items inside the widest allowed window,
-	// then apply each recipient's own lead time in Go so the window never needs
-	// engine-specific date arithmetic.
+	// The query applies each recipient's own lead time and skips items already
+	// reminded, so every returned row is a candidate and the batch advances.
 	horizon := today.AddDate(0, 0, services.MaxReminderDays)
 
 	items, err := s.items.ListDueSoonItemsForReminderUsers(today, horizon, s.config.BatchSize)
@@ -126,10 +126,6 @@ func (s *DueDateReminderScheduler) RunOnce(ctx context.Context, now time.Time) {
 			return
 		}
 		item := items[i]
-		limit := today.AddDate(0, 0, item.ReminderDays)
-		if item.DueDate.After(limit) {
-			continue
-		}
 		if err := s.notify(item, now); err != nil {
 			slog.Warn("due-date reminders: failed to create reminder",
 				slog.String("component", "reminders"),
@@ -140,30 +136,19 @@ func (s *DueDateReminderScheduler) RunOnce(ctx context.Context, now time.Time) {
 }
 
 func (s *DueDateReminderScheduler) notify(item repository.DueSoonItem, now time.Time) error {
-	itemKey := fmt.Sprintf("%s-%d", item.WorkspaceKey, item.ItemNumber)
-	dueDate := item.DueDate.Format("2006-01-02")
-	claimed, err := s.items.ClaimDueDateReminder(item.ItemID, item.RecipientID, dueDate)
-	if err != nil {
+	if err := s.notifications.NotifyDueDateReminder(services.DueDateReminder{
+		RecipientID: item.RecipientID,
+		WorkspaceID: item.WorkspaceID,
+		ItemID:      item.ItemID,
+		ItemKey:     fmt.Sprintf("%s-%d", item.WorkspaceKey, item.ItemNumber),
+		Title:       item.Title,
+		DueDate:     item.DueDate,
+	}, now); err != nil {
 		return err
 	}
-	if !claimed {
-		return nil
-	}
-	workspaceID, itemID := item.WorkspaceID, item.ItemID
-	_, err = s.notifications.CreateNotification(models.Notification{
-		UserID:             item.RecipientID,
-		Title:              fmt.Sprintf("Reminder: %s is due soon", itemKey),
-		Message:            fmt.Sprintf("%s is due on %s", item.Title, dueDate),
-		Type:               "reminder",
-		Timestamp:          now,
-		Read:               false,
-		ActionURL:          fmt.Sprintf("/workspaces/%d/items/%d", workspaceID, itemID),
-		AuthorizationScope: models.NotificationScopeWorkspace,
-		WorkspaceID:        &workspaceID,
-		ItemID:             &itemID,
-		SourceType:         "item.due_reminder",
-		SourceID:           &itemID,
-		DeliveryKey:        fmt.Sprintf("due-reminder:%d:%s:%d", itemID, dueDate, item.RecipientID),
-	})
-	return err
+	// Record the ledger even when the recipient was filtered out (inactive,
+	// agent, or no workspace access) so the candidate cannot consume a batch
+	// slot on every sweep. A failed insert returns before this point, so the
+	// reminder is retried; the delivery key keeps the retry from duplicating it.
+	return s.items.RecordDueDateReminder(item.ItemID, item.RecipientID, item.DueDate.Format("2006-01-02"))
 }

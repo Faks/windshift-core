@@ -6,8 +6,8 @@ import (
 )
 
 // DueSoonItem is the projection the due-date reminder sweep needs: the
-// opted-in recipient to notify, their configured lead time, and enough item
-// identity to build a deep link and delivery key.
+// opted-in recipient to notify and enough item identity to build a deep link
+// and delivery key.
 type DueSoonItem struct {
 	ItemID       int
 	WorkspaceID  int
@@ -16,42 +16,46 @@ type DueSoonItem struct {
 	Title        string
 	DueDate      time.Time
 	RecipientID  int
-	// ReminderDays is the recipient's configured lead time in days.
-	ReminderDays int
 }
 
-// ClaimDueDateReminder records that a due-date reminder was sent for the
-// (item, user, due date) triple and reports whether this call created the
-// record. A false result means a reminder was already recorded, so dismissing
-// the notification cannot resurrect it on the next sweep.
-func (r *ItemRepository) ClaimDueDateReminder(itemID, userID int, dueDate string) (bool, error) {
-	result, err := r.db.ExecWrite(`
+// RecordDueDateReminder records that a due-date reminder was sent for the
+// (item, user, due date) triple. It is idempotent, and the ledger outlives the
+// notification row so dismissing the notification cannot resurrect it.
+func (r *ItemRepository) RecordDueDateReminder(itemID, userID int, dueDate string) error {
+	if _, err := r.db.ExecWrite(`
 		INSERT INTO item_due_reminders (item_id, user_id, due_date)
 		VALUES (?, ?, ?)
 		ON CONFLICT(item_id, user_id, due_date) DO NOTHING
-	`, itemID, userID, dueDate)
-	if err != nil {
-		return false, fmt.Errorf("claim due-date reminder: %w", err)
+	`, itemID, userID, dueDate); err != nil {
+		return fmt.Errorf("record due-date reminder: %w", err)
 	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return false, fmt.Errorf("read due-date reminder claim result: %w", err)
-	}
-	return rows == 1, nil
+	return nil
 }
 
-// ListDueSoonItemsForReminderUsers returns up to limit non-completed items due
-// inside [from, to] whose recipient has opted into due-date reminders. The
-// recipient is the assignee for regular items and the workspace owner for
-// personal-workspace items without an assignee. Each row carries the
-// recipient's configured lead time so the caller can apply the per-user window.
+// ListDueSoonItemsForReminderUsers returns up to limit non-completed items that
+// are due within their recipient's configured lead time and have not already
+// been reminded. The recipient is the assignee for regular items and the
+// workspace owner for personal-workspace items without an assignee. The
+// lead-time window and the sent-reminder exclusion both run in SQL, so every
+// returned row is a candidate and a full batch always makes progress instead
+// of re-selecting rows that can never be claimed.
 func (r *ItemRepository) ListDueSoonItemsForReminderUsers(from, to time.Time, limit int) ([]DueSoonItem, error) {
 	if limit <= 0 {
 		limit = 500
 	}
+	// Lead-time comparison and ledger date formatting are the only
+	// engine-specific pieces: SQLite uses date() modifiers, PostgreSQL adds an
+	// integer to a date. Both normalize to YYYY-MM-DD so the ledger text
+	// matches the value the sweep writes.
+	leadPredicate := `date(i.due_date) <= date(?, '+' || up.due_date_reminder_days || ' days')`
+	ledgerDate := `date(i.due_date)`
+	if r.db.GetDriverName() == "postgres" {
+		leadPredicate = `i.due_date <= ?::date + up.due_date_reminder_days`
+		ledgerDate = `i.due_date::text`
+	}
 	rows, err := r.db.Query(`
 		SELECT i.id, i.workspace_id, COALESCE(w.key, ''), i.workspace_item_number,
-		       i.title, i.due_date, COALESCE(i.assignee_id, w.owner_id), up.due_date_reminder_days
+		       i.title, i.due_date, COALESCE(i.assignee_id, w.owner_id)
 		FROM items i
 		JOIN workspaces w ON w.id = i.workspace_id
 		JOIN user_preferences up ON up.user_id = COALESCE(i.assignee_id, w.owner_id)
@@ -61,11 +65,18 @@ func (r *ItemRepository) ListDueSoonItemsForReminderUsers(from, to time.Time, li
 		  AND i.due_date IS NOT NULL
 		  AND i.due_date >= ?
 		  AND i.due_date <= ?
+		  AND `+leadPredicate+`
 		  AND COALESCE(sc.is_completed, FALSE) = FALSE
 		  AND (i.assignee_id IS NOT NULL OR w.is_personal = TRUE)
+		  AND NOT EXISTS (
+		      SELECT 1 FROM item_due_reminders r
+		      WHERE r.item_id = i.id
+		        AND r.user_id = COALESCE(i.assignee_id, w.owner_id)
+		        AND r.due_date = `+ledgerDate+`
+		  )
 		ORDER BY i.due_date ASC, i.id ASC
 		LIMIT ?
-	`, from, to, limit)
+	`, from, to, from, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list due-soon items for reminder users: %w", err)
 	}
@@ -75,7 +86,7 @@ func (r *ItemRepository) ListDueSoonItemsForReminderUsers(from, to time.Time, li
 	for rows.Next() {
 		var item DueSoonItem
 		if err := rows.Scan(&item.ItemID, &item.WorkspaceID, &item.WorkspaceKey, &item.ItemNumber,
-			&item.Title, &item.DueDate, &item.RecipientID, &item.ReminderDays); err != nil {
+			&item.Title, &item.DueDate, &item.RecipientID); err != nil {
 			return nil, fmt.Errorf("scan due-soon reminder item: %w", err)
 		}
 		items = append(items, item)
