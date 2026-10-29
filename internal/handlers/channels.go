@@ -248,6 +248,26 @@ func (h *ChannelHandler) GetChannels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Intakes are opt-in: callers resolving portal linkage get them in this one
+	// request instead of one request per channel. A failed load fails the whole
+	// list, so it is distinguishable from a channel with no intakes.
+	if q.Get("include_intakes") == "true" && len(channels) > 0 {
+		ids := make([]int, len(channels))
+		for i := range channels {
+			ids[i] = channels[i].ID
+		}
+		byMailbox, err := repository.NewIntakeRepository(h.channelRepo.DB()).ListByMailboxes(ctx, ids)
+		if err != nil {
+			respondInternalError(w, r, err)
+			return
+		}
+		for i := range channels {
+			if intakes := byMailbox[channels[i].ID]; len(intakes) > 0 {
+				channels[i].Intakes = intakes
+			}
+		}
+	}
+
 	respondJSONOK(w, channels)
 }
 

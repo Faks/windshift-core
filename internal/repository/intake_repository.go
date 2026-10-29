@@ -141,6 +141,36 @@ func (r *IntakeRepository) ListEnabledForMailbox(ctx context.Context, mailboxID 
 	return scanIntakes(rows)
 }
 
+// ListByMailboxes returns every intake reading from the given mailboxes in
+// one query, grouped by mailbox id. Mailboxes without intakes are absent from
+// the map. Used to attach intake linkage to a channel listing without one
+// request per channel.
+func (r *IntakeRepository) ListByMailboxes(ctx context.Context, mailboxIDs []int) (map[int][]models.Intake, error) {
+	out := make(map[int][]models.Intake)
+	placeholders, args := inPlaceholders(mailboxIDs)
+	if placeholders == "" {
+		return out, nil
+	}
+	rows, err := r.db.QueryContext(ctx, `SELECT`+intakeSelectColumns+intakeFromJoins+`
+		WHERE i.mailbox_id IN (`+placeholders+`)
+		ORDER BY i.mailbox_id, i.folder, i.id`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list intakes for mailboxes: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		in, scanErr := scanIntake(rows)
+		if scanErr != nil {
+			return nil, fmt.Errorf("scan intake: %w", scanErr)
+		}
+		out[in.MailboxID] = append(out[in.MailboxID], in)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate intakes: %w", err)
+	}
+	return out, nil
+}
+
 // ListByPortal returns the intakes that expose requests to a portal.
 func (r *IntakeRepository) ListByPortal(ctx context.Context, portalChannelID int) ([]models.Intake, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT`+intakeSelectColumns+intakeFromJoins+`

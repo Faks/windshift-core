@@ -22,6 +22,9 @@ type Channel struct {
 	CategoryName  string           `json:"category_name,omitempty"`  // Category name (from JOIN)
 	CategoryColor string           `json:"category_color,omitempty"` // Category color (from JOIN)
 	Managers      []ChannelManager `json:"managers,omitempty"`       // Channel managers for detailed views
+	// Intakes is populated on demand by GET /channels?include_intakes=true so
+	// callers can resolve portal linkage without one request per channel.
+	Intakes []Intake `json:"intakes,omitempty"`
 }
 
 // ChannelCategory represents a grouping for channels
