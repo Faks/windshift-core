@@ -1377,14 +1377,23 @@ func (ns *NotificationService) determineRecipients(event *NotificationEvent, rul
 		if skipAsAgent[userID] {
 			continue
 		}
-		if !ns.canViewWorkspace(userID, event.WorkspaceID) {
+		// Resolve the recipient's permission snapshot once and reuse it for
+		// the workspace view check and the referenced-entity check. The
+		// is_agent/is_active probe above is already batched, so no per-recipient
+		// user query is needed.
+		permissions, err := ns.recipientPermissions(userID)
+		if err != nil {
+			slog.Warn("permission snapshot failed during recipient filtering; denying",
+				slog.String("component", "notifications"),
+				slog.Int("user_id", userID),
+				slog.Any("error", err))
+			continue
+		}
+		if !ns.canViewWorkspaceSnapshot(permissions, event.WorkspaceID) {
 			continue
 		}
 		if event.ReferencedEntityType != "" || event.ReferencedWorkspacePermission != "" {
-			snapshot, err := ns.notificationAuth.Snapshot(userID)
-			if err != nil {
-				continue
-			}
+			snapshot := ns.notificationAuth.snapshotForRecipient(userID, true, permissions)
 			visible, err := snapshot.Visible(models.Notification{
 				UserID:                        userID,
 				AuthorizationScope:            models.NotificationScopeSystem,
@@ -1468,27 +1477,26 @@ func (ns *NotificationService) agentOrUnknownUsers(userIDs []int) map[int]bool {
 	return skip
 }
 
-// canViewWorkspace returns true when the user currently has item-view
-// permission on the workspace. A nil permService (test wiring) means we
-// fall back to "allow" so legacy paths keep working.
-func (ns *NotificationService) canViewWorkspace(userID, workspaceID int) bool {
-	return ns.canUseWorkspacePermission(userID, workspaceID, models.PermissionItemView)
-}
-
-func (ns *NotificationService) canUseWorkspacePermission(userID, workspaceID int, permission string) bool {
+// canViewWorkspaceSnapshot answers the item.view fan-out check from an already
+// resolved snapshot. A nil permission service (test wiring) admits every
+// recipient; a nil snapshot with a live service fails closed.
+func (ns *NotificationService) canViewWorkspaceSnapshot(permissions *models.UserPermissionCache, workspaceID int) bool {
 	if ns.permService == nil {
 		return true
 	}
-	ok, err := ns.permService.HasWorkspacePermission(userID, workspaceID, permission)
-	if err != nil {
-		slog.Warn("permission check failed during recipient filtering; denying",
-			slog.String("component", "notifications"),
-			slog.Int("user_id", userID),
-			slog.Int("workspace_id", workspaceID),
-			slog.Any("error", err))
+	if permissions == nil {
 		return false
 	}
-	return ok
+	return ns.permService.workspacePermission(permissions, workspaceID, models.PermissionItemView)
+}
+
+// recipientPermissions resolves a recipient's permission snapshot once per
+// fan-out pass. A nil permission service (test wiring) returns a nil snapshot.
+func (ns *NotificationService) recipientPermissions(userID int) (*models.UserPermissionCache, error) {
+	if ns.permService == nil {
+		return nil, nil
+	}
+	return ns.permService.GetUserEffectivePermissions(userID)
 }
 
 // queryUserIDs runs a query that selects a single user-id column and returns
