@@ -19,7 +19,7 @@
   import ListOrdered from '@lucide/svelte/icons/list-ordered';
   import Strikethrough from '@lucide/svelte/icons/strikethrough';
   import ImageIcon from '@lucide/svelte/icons/image';
-  import Workflow from '@lucide/svelte/icons/workflow';
+  import IconGraph from '@tabler/icons-svelte-runes/icons/graph';
   import BookOpen from '@lucide/svelte/icons/book-open';
   import { getAssignableUsers, getUsers } from '../api/users.js';
   import { attachments as attachmentsApi } from '../api/misc.js';
@@ -930,7 +930,7 @@
         <Tooltip content={t('editors.insertDiagram')} placement="bottom">
           {#snippet children()}
             <button type="button" class="toolbar-btn" tabindex="-1" onclick={openDiagramCreate} aria-label={t('editors.insertDiagram')} data-testid="milkdown-insert-diagram">
-              <Workflow size={14} />
+              <IconGraph size={14} />
             </button>
           {/snippet}
         </Tooltip>
