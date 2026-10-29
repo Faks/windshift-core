@@ -77,11 +77,11 @@ const (
 // e.g. "item", "comment", "page"), entityID the mutated row's ID, toolName
 // the aitools tool that performed the write (stored as the action type so
 // agent writes are queryable per tool), and summary a human-readable
-// resource name. The Source field on Env tags which surface initiated the
-// write (ai_chat | mcp) via details.source, so the audit trail can
-// distinguish agent writes from cookie-auth writes. Best-effort: failures
-// are logged, never propagated, so a successful tool call is not broken by
-// an audit miss (same policy as the diagram history writes).
+// resource name. The Env Source (ai_chat | mcp) is written to the event's
+// Source field, so the audit trail can distinguish agent writes from
+// cookie-auth writes. Best-effort: failures are logged, never propagated, so
+// a successful tool call is not broken by an audit miss (same policy as the
+// diagram history writes).
 func (e *Env) AuditWrite(entityType string, entityID int, toolName, summary string) {
 	e.audit(toolName, entityType, entityID, summary, nil)
 }

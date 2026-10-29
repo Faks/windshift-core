@@ -64,6 +64,26 @@ const (
 	ResponseEmpty        ResponseShape = "empty"
 )
 
+// AuditKind classifies how a mutating route reaches the audit log. Every
+// mutating route must be classified; TestMutatingRoutesHaveAuditSpec enforces
+// it against auditSpecRegistry.
+type AuditKind string
+
+const (
+	// AuditUnspecified means the route is not classified. The coverage test
+	// fails on it.
+	AuditUnspecified AuditKind = ""
+	// AuditRecorder means the handler records the event with logger.Record and
+	// the request middleware flushes it.
+	AuditRecorder AuditKind = "recorder"
+	// AuditService means the application service emits the central audit event
+	// with the request actor.
+	AuditService AuditKind = "service"
+	// AuditExempt means the mutation was reviewed and intentionally does not
+	// write a central audit event; the registry comment records why.
+	AuditExempt AuditKind = "exempt"
+)
+
 // Route describes one canonical operation and its authentication boundaries.
 type Route struct {
 	Method      string
@@ -90,6 +110,9 @@ type Route struct {
 	ResponseShape     ResponseShape
 	Parameters        []ParameterMetadata
 	DocumentedErrors  []int
+	// Audit classifies how a mutating route reaches the audit log. It is set
+	// from auditSpecRegistry for mutating methods and empty for reads.
+	Audit AuditKind
 }
 
 // ParameterMetadata is the public contract for one operation parameter.
@@ -904,7 +927,20 @@ func buildRoutes(deps Deps) []route {
 	registerSLAMetricRoutes(&builder, deps)
 	registerTicketImportRoutes(&builder, deps.TicketImport)
 	applyEmbeddedContractMetadata(builder.routes, contractMetadataJSON)
+	applyAuditSpecs(builder.routes)
 	return builder.routes
+}
+
+// applyAuditSpecs classifies every mutating route from auditSpecRegistry. A
+// route absent from the registry keeps AuditUnspecified so the coverage test
+// fails until it is reviewed and classified.
+func applyAuditSpecs(routes []route) {
+	for index := range routes {
+		if isSafeMethod(routes[index].Method) {
+			continue
+		}
+		routes[index].Audit = auditSpecRegistry[routes[index].OperationID]
+	}
 }
 
 func applyEmbeddedContractMetadata(routes []route, document []byte) {
@@ -1408,7 +1444,14 @@ func registerMount(mux *http.ServeMux, prefix string, routes []route, deps Deps,
 					handler = requireBearer(deps.Tokens, selected.Scopes, selected.ScopesAny)(handler)
 				}
 			}
-			return handler(w, r)
+			// One recorder per request: handlers append, and the middleware
+			// flushes after the handler returns so HTTP audit has a single
+			// writer. Success events are gated on the handler outcome.
+			recorder := logger.NewAuditRecorder()
+			r = r.WithContext(logger.WithAuditRecorder(r.Context(), recorder))
+			handlerErr := handler(w, r)
+			deps.AdminAuditor.Flush(recorder, handlerErr == nil)
+			return handlerErr
 		}
 		if len(allowed) > 0 {
 			return methodNotAllowed(allowed)(w, r)

@@ -64,6 +64,9 @@ func adminUserFilter(r *http.Request) (*int, error) {
 	return nil, nil
 }
 
+// listAdminAuditLogs serves the audit log to API and SIEM consumers. There is
+// no in-repo viewer: the historical AuditLog page was removed, and WI-1903
+// deleted its dead locale namespaces rather than resurrecting it.
 func listAdminAuditLogs(deps Deps) pageOperation[auditLogDTO] {
 	return func(r *http.Request) ([]auditLogDTO, Pagination, int, error) {
 		if _, err := requireSystemAdmin(r, deps); err != nil {
@@ -73,28 +76,21 @@ func listAdminAuditLogs(deps Deps) pageOperation[auditLogDTO] {
 		if err != nil {
 			return nil, page, 0, err
 		}
-		filters := repository.AuditLogFilters{ActionType: r.URL.Query().Get("action_type"), ResourceType: r.URL.Query().Get("resource_type"), Source: r.URL.Query().Get("source")}
-		filters.UserID, err = adminUserFilter(r)
+		filters, err := repository.ParseAuditLogFilters(r.URL.Query())
 		if err != nil {
-			return nil, page, 0, err
-		}
-		for _, bound := range []struct {
-			name   string
-			target **time.Time
-		}{{"from", &filters.From}, {"to", &filters.To}} {
-			if value := r.URL.Query().Get(bound.name); value != "" {
-				parsed, parseErr := time.Parse(time.RFC3339, value)
-				if parseErr != nil {
-					return nil, page, 0, newError(http.StatusBadRequest, "invalid_request", bound.name+" must be RFC3339")
-				}
-				*bound.target = &parsed
-			}
+			return nil, page, 0, newError(http.StatusBadRequest, "invalid_request", err.Error())
 		}
 		rows, total, err := deps.AuditLogs.List(filters, page.Page, page.PageSize)
 		if err != nil {
 			return nil, page, 0, internalError(err)
 		}
-		return auditLogDTOs(rows), page, total, nil
+		entries := auditLogDTOs(rows)
+		details := filters.Details()
+		details["count"] = len(entries)
+		details["total"] = total
+		details["page"] = page.Page
+		logger.Record(r, logger.ActionAuditLogRead, logger.ResourceAuditLog, nil, "audit_log", details)
+		return entries, page, total, nil
 	}
 }
 
@@ -127,6 +123,11 @@ func streamAdminAuditLogs(deps Deps) readOperation[auditLogStreamDTO] {
 		if len(rows) > 0 {
 			next = rows[len(rows)-1].ID
 		}
+		logger.Record(r, logger.ActionAuditLogStream, logger.ResourceAuditLog, nil, "audit_log", map[string]any{
+			"after_id": afterID,
+			"limit":    limit,
+			"count":    len(rows),
+		})
 		return auditLogStreamDTO{Entries: auditLogDTOs(rows), NextAfterID: next, HasMore: len(rows) == limit}, nil
 	}
 }
@@ -165,8 +166,7 @@ func listAdminTokens(deps Deps) pageOperation[models.APIToken] {
 
 func revokeAdminToken(deps Deps) commandOperation {
 	return func(r *http.Request) error {
-		actor, err := requireSystemAdmin(r, deps)
-		if err != nil {
+		if _, err := requireSystemAdmin(r, deps); err != nil {
 			return err
 		}
 		id, err := pathID(r, "token_id")
@@ -179,7 +179,7 @@ func revokeAdminToken(deps Deps) commandOperation {
 			}
 			return internalError(err)
 		}
-		deps.AdminAuditor.Log(r, actor, logger.ActionAPITokenAdminRevoke, logger.ResourceAPIToken, &id, "")
+		logger.Record(r, logger.ActionAPITokenAdminRevoke, logger.ResourceAPIToken, &id, "", nil)
 		return nil
 	}
 }

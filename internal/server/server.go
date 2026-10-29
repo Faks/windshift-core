@@ -872,7 +872,7 @@ func (s *Server) initialize() error {
 	invitationHandler := handlers.NewInvitationHandler(invitationService)
 
 	themeHandler := handlers.NewThemeHandler(services.NewThemeService(repository.NewThemeRepository(s.db)), logger.NewAuditor(s.db)).WithObjectTranslations(objectTranslationService)
-	objectTranslationHandler := handlers.NewObjectTranslationHandler(objectTranslationService)
+	objectTranslationHandler := handlers.NewObjectTranslationHandler(objectTranslationService, logger.NewAuditor(s.db))
 	userPreferencesService := services.NewUserPreferencesService(repository.NewUserPreferencesRepository(s.db), repository.NewThemeRepository(s.db), permService)
 	userPreferencesHandler := handlers.NewUserPreferencesHandler(userPreferencesService)
 	customWidgetHandler := handlers.NewCustomWidgetHandler(repository.NewCustomWidgetRepository(s.db), permService)
@@ -1502,7 +1502,7 @@ func (s *Server) initialize() error {
 	pluginHandler := handlers.NewPluginHandler(s.pluginManager, repository.NewPluginRegistryRepository(s.db), logger.NewAuditor(s.db), cfg.Plugins.Disabled)
 	pluginHandler.SetLicensing(pluginLicenseVerifier, instanceService)
 
-	auditLogHandler := handlers.NewAuditLogHandler(repository.NewAuditLogRepository(s.db))
+	auditLogHandler := handlers.NewAuditLogHandler(repository.NewAuditLogRepository(s.db), logger.NewAuditor(s.db))
 
 	// LDAP handler — keep on Server so Shutdown can drain in-flight syncs.
 	ldapSyncService := ldap.NewSyncService(s.db, ssoHandler.GetEncryption(), func(userID int) error {

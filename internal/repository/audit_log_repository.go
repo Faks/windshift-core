@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -226,6 +228,90 @@ func (r *AuditLogRepository) queryDistinctStrings(query string) ([]string, error
 	return result, nil
 }
 
+// Details returns the non-empty filter fields as an audit-details map, so a
+// read event records which slice of the log was requested.
+func (f AuditLogFilters) Details() map[string]any {
+	details := map[string]any{}
+	if f.ActionType != "" {
+		details["action_type"] = f.ActionType
+	}
+	if f.UserID != nil {
+		details["user_id"] = *f.UserID
+	}
+	if f.ResourceType != "" {
+		details["resource_type"] = f.ResourceType
+	}
+	if f.Source != "" {
+		details["source"] = f.Source
+	}
+	if f.Success != nil {
+		details["success"] = *f.Success
+	}
+	if f.From != nil {
+		details["from"] = f.From.Format(time.RFC3339)
+	}
+	if f.To != nil {
+		details["to"] = f.To.Format(time.RFC3339)
+	}
+	if f.Search != "" {
+		details["search"] = f.Search
+	}
+	return details
+}
+
+// AuditLogFilterError is a client error raised while parsing the shared
+// audit-log query contract. Transport adapters map it to their own 400 shape.
+type AuditLogFilterError struct{ Message string }
+
+func (e *AuditLogFilterError) Error() string { return e.Message }
+
+// ParseAuditLogFilters parses the canonical audit-log query contract shared by
+// the legacy, REST v1, and REST v2 read surfaces, so the same query selects the
+// same rows everywhere. Unknown parameters are ignored; a malformed value is a
+// client error.
+func ParseAuditLogFilters(values url.Values) (AuditLogFilters, error) {
+	filters := AuditLogFilters{
+		ActionType:   values.Get("action_type"),
+		ResourceType: values.Get("resource_type"),
+		Source:       values.Get("source"),
+		Search:       values.Get("search"),
+	}
+	if value := values.Get("user_id"); value != "" {
+		id, err := strconv.Atoi(value)
+		if err != nil || id <= 0 {
+			return filters, &AuditLogFilterError{Message: "Invalid user_id (expected a positive integer)"}
+		}
+		filters.UserID = &id
+	}
+	if value := values.Get("success"); value != "" {
+		switch value {
+		case "true":
+			trueValue := true
+			filters.Success = &trueValue
+		case "false":
+			falseValue := false
+			filters.Success = &falseValue
+		default:
+			return filters, &AuditLogFilterError{Message: "Invalid success (expected true or false)"}
+		}
+	}
+	for _, bound := range []struct {
+		name   string
+		target **time.Time
+	}{{"from", &filters.From}, {"to", &filters.To}} {
+		if value := values.Get(bound.name); value != "" {
+			parsed, err := time.Parse(time.RFC3339, value)
+			if err != nil {
+				return filters, &AuditLogFilterError{Message: "Invalid " + bound.name + " (expected RFC3339)"}
+			}
+			*bound.target = &parsed
+		}
+	}
+	return filters, nil
+}
+
+// auditLogSearchPattern escapes LIKE wildcards so a search term containing
+// `%`, `_`, or `\` is matched literally.
 func auditLogSearchPattern(s string) (pattern string, escaped bool) {
 	escapedPattern := escapeLikePattern(s)
 	if escapedPattern == s {

@@ -130,6 +130,33 @@
             }
           },
           {
+            "Name": "source",
+            "In": "query",
+            "Description": "Exact match on the event source (USER, SCIM, SYSTEM).",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
+            "Name": "success",
+            "In": "query",
+            "Description": "Filter by the success flag.",
+            "Required": false,
+            "Schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "Name": "search",
+            "In": "query",
+            "Description": "Case-insensitive substring match on username, resource name, or action type.",
+            "Required": false,
+            "Schema": {
+              "type": "string"
+            }
+          },
+          {
             "Name": "from",
             "In": "query",
             "Description": "Inclusive RFC3339 timestamp bound.",

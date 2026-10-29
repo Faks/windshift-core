@@ -340,6 +340,13 @@ func (h *UserHandler) UpdateAvatar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.auditor.LogWithDetails(r, currentUser,
+		logger.ActionUserAvatarUpdate,
+		logger.ResourceUser,
+		&id, user.Username,
+		map[string]any{"avatar_url": avatarURL},
+	)
+
 	respondJSONOK(w, user)
 }
 

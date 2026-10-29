@@ -277,7 +277,7 @@ func (h *CLIAuthHandler) Deny(w http.ResponseWriter, r *http.Request) {
 	req, _ := decodeJSON[ApproveRequest](w, r) // best-effort body, optional fields
 	sanitizeApproveRequest(&req)
 
-	h.auditor.LogWithDetails(r, currentUser, "cli_onboarding.deny", logger.ResourceUser, nil, "", map[string]any{
+	h.auditor.LogWithDetails(r, currentUser, logger.ActionCLIOnboardingDeny, logger.ResourceUser, nil, "", map[string]any{
 		"hostname":   req.Hostname,
 		"agent_name": sanitizeAgentName(req.AgentName),
 	})
@@ -440,5 +440,5 @@ func cliAuthAgentID(code *repository.CLIAuthCode) int64 {
 }
 
 func (h *CLIAuthHandler) auditApproveFailure(r *http.Request, user *models.User, agentName, reason string) {
-	h.auditor.LogFailure(r, user, "cli_onboarding.approve", logger.ResourceUser, nil, agentName, reason, map[string]any{"reason": reason})
+	h.auditor.LogFailure(r, user, logger.ActionCLIOnboardingApprove, logger.ResourceUser, nil, agentName, reason, map[string]any{"reason": reason})
 }

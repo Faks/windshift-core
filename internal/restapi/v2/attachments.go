@@ -222,7 +222,7 @@ func deleteItemAttachment(deps Deps) commandOperation {
 		if err := deps.Attachments.DeleteItemAttachment(r.Context(), attachmentID, user.ID); err != nil {
 			return attachmentError(err)
 		}
-		deps.AdminAuditor.LogWithDetails(r, user, logger.ActionAttachmentDelete, logger.ResourceAttachment, &attachmentID, attachment.OriginalFilename, map[string]any{
+		logger.Record(r, logger.ActionAttachmentDelete, logger.ResourceAttachment, &attachmentID, attachment.OriginalFilename, map[string]any{
 			"item_id": *attachment.ItemID,
 		})
 		return nil

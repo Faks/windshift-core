@@ -7,20 +7,23 @@ import (
 	"strconv"
 	"time"
 
+	"windshift/internal/logger"
 	"windshift/internal/models"
 	"windshift/internal/repository"
+	"windshift/internal/utils"
 )
 
 // AuditLogHandler handles audit log query endpoints.
 type AuditLogHandler struct {
 	repo          *repository.AuditLogRepository
+	auditor       *logger.Auditor
 	conversations *repository.AgentConversationRepository
 	runs          *repository.AgentRunRepository
 }
 
 // NewAuditLogHandler creates a new audit log handler.
-func NewAuditLogHandler(repo *repository.AuditLogRepository) *AuditLogHandler {
-	return &AuditLogHandler{repo: repo}
+func NewAuditLogHandler(repo *repository.AuditLogRepository, auditor *logger.Auditor) *AuditLogHandler {
+	return &AuditLogHandler{repo: repo, auditor: auditor}
 }
 
 func (h *AuditLogHandler) SetAgentTranscriptRepositories(conversations *repository.AgentConversationRepository, runs *repository.AgentRunRepository) {
@@ -69,43 +72,10 @@ func (h *AuditLogHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) 
 		perPage = 50
 	}
 
-	filters := repository.AuditLogFilters{
-		ActionType:   q.Get("action_type"),
-		ResourceType: q.Get("resource_type"),
-		Source:       q.Get("source"),
-		Search:       q.Get("search"),
-	}
-	if v := q.Get("user_id"); v != "" {
-		uid, err := strconv.Atoi(v)
-		if err != nil {
-			respondBadRequest(w, r, "Invalid user_id")
-			return
-		}
-		filters.UserID = &uid
-	}
-	if v := q.Get("success"); v != "" {
-		if v != "true" && v != "false" {
-			respondBadRequest(w, r, "Invalid success (expected true or false)")
-			return
-		}
-		b := v == "true"
-		filters.Success = &b
-	}
-	if v := q.Get("from"); v != "" {
-		t, err := time.Parse(time.RFC3339, v)
-		if err != nil {
-			respondBadRequest(w, r, "Invalid from (expected RFC3339)")
-			return
-		}
-		filters.From = &t
-	}
-	if v := q.Get("to"); v != "" {
-		t, err := time.Parse(time.RFC3339, v)
-		if err != nil {
-			respondBadRequest(w, r, "Invalid to (expected RFC3339)")
-			return
-		}
-		filters.To = &t
+	filters, err := repository.ParseAuditLogFilters(q)
+	if err != nil {
+		respondBadRequest(w, r, err.Error())
+		return
 	}
 
 	rows, total, err := h.repo.List(filters, page, perPage)
@@ -122,6 +92,14 @@ func (h *AuditLogHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) 
 	totalPages := total / perPage
 	if total%perPage > 0 {
 		totalPages++
+	}
+
+	if currentUser := utils.GetCurrentUser(r); currentUser != nil {
+		details := filters.Details()
+		details["count"] = len(entries)
+		details["total"] = total
+		details["page"] = page
+		h.auditor.LogWithDetails(r, currentUser, logger.ActionAuditLogRead, logger.ResourceAuditLog, nil, "audit_log", details)
 	}
 
 	respondJSONOK(w, AuditLogResponse{
@@ -219,6 +197,14 @@ func (h *AuditLogHandler) StreamAuditLogsSince(w http.ResponseWriter, r *http.Re
 	nextAfterID := afterID
 	if len(entries) > 0 {
 		nextAfterID = entries[len(entries)-1].ID
+	}
+
+	if currentUser := utils.GetCurrentUser(r); currentUser != nil {
+		h.auditor.LogWithDetails(r, currentUser, logger.ActionAuditLogStream, logger.ResourceAuditLog, nil, "audit_log", map[string]any{
+			"after_id": afterID,
+			"limit":    limit,
+			"count":    len(entries),
+		})
 	}
 
 	respondJSONOK(w, AuditLogStreamResponse{

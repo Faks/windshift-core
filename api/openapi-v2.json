@@ -97678,6 +97678,33 @@
             }
           },
           {
+            "description": "Exact match on the event source (USER, SCIM, SYSTEM).",
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by the success flag.",
+            "in": "query",
+            "name": "success",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Case-insensitive substring match on username, resource name, or action type.",
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Inclusive RFC3339 timestamp bound.",
             "in": "query",
             "name": "from",

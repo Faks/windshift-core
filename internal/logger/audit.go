@@ -139,6 +139,9 @@ const (
 	// small summary fields an operator needs.
 	auditDetailsMaxStringBytes = 512
 	auditDetailsMaxSliceItems  = 100
+	// auditStructuredDetailsMaxBytes bounds the details JSON mirrored to the
+	// live log line so a large payload cannot flood the log stream.
+	auditStructuredDetailsMaxBytes = 8 * 1024
 )
 
 // auditSource resolves the event's source. An explicit Source wins; otherwise
@@ -174,8 +177,8 @@ type auditInsert struct {
 
 // LogAudit logs an audit event to the database (immediate write).
 func LogAudit(db database.Database, event AuditEvent) error {
-	insert, source := prepareAuditEvent(event)
-	emitAuditStructuredLog(event, source)
+	insert, source, detailsJSON := prepareAuditEvent(event)
+	emitAuditStructuredLog(event, source, detailsJSON)
 
 	if _, err := db.ExecWrite(auditInsertQuery, insert.args...); err != nil {
 		logAuditFailure(event, source, err)
@@ -195,8 +198,8 @@ func LogAudit(db database.Database, event AuditEvent) error {
 // commits or rolls back atomically with the mutation it describes. Callers
 // that need that coupling use this instead of LogAudit.
 func LogAuditTx(ctx context.Context, tx database.Tx, event AuditEvent) error {
-	insert, source := prepareAuditEvent(event)
-	emitAuditStructuredLog(event, source)
+	insert, source, detailsJSON := prepareAuditEvent(event)
+	emitAuditStructuredLog(event, source, detailsJSON)
 
 	if _, err := tx.ExecWriteContext(ctx, auditInsertQuery, insert.args...); err != nil {
 		logAuditFailure(event, source, err)
@@ -224,13 +227,13 @@ func logAuditFailure(event AuditEvent, source string, err error) {
 
 // prepareAuditEvent sanitizes the details and resolves the insert values. It
 // is shared by LogAudit and LogAuditTx so both paths store identical shapes.
-func prepareAuditEvent(event AuditEvent) (insert auditInsert, source string) {
+func prepareAuditEvent(event AuditEvent) (insert auditInsert, source string, detailsJSON *string) {
 	// Convert details map to JSON. On marshal failure we still persist
 	// the audit row, but with a sentinel { "details_marshal_error": ... }
 	// so the trail records *that* an event occurred and that its details
 	// were lost — better than silently storing NULL while callers (~80 of
 	// 81 sites discard LogAudit's error) believe rich details were saved.
-	var detailsJSON *string
+	var detailsJSONOut *string
 	if len(event.Details) > 0 {
 		safeDetails, _ := sanitizeAuditDetails(event.Details).(map[string]any)
 		detailsBytes, err := json.Marshal(safeDetails)
@@ -239,17 +242,17 @@ func prepareAuditEvent(event AuditEvent) (insert auditInsert, source string) {
 			sentinel, mErr := json.Marshal(map[string]string{"details_marshal_error": err.Error()})
 			if mErr == nil {
 				s := string(sentinel)
-				detailsJSON = &s
+				detailsJSONOut = &s
 			} else {
 				s := `{"details_marshal_error":"unknown"}`
-				detailsJSON = &s
+				detailsJSONOut = &s
 			}
 		} else {
 			if len(detailsBytes) > auditDetailsMaxBytes {
 				detailsBytes = truncateAuditDetails(safeDetails, len(detailsBytes))
 			}
 			detailsStr := string(detailsBytes)
-			detailsJSON = &detailsStr
+			detailsJSONOut = &detailsStr
 		}
 	}
 
@@ -276,16 +279,18 @@ func prepareAuditEvent(event AuditEvent) (insert auditInsert, source string) {
 		event.ResourceType,
 		event.ResourceID,
 		event.ResourceName,
-		detailsJSON,
+		detailsJSONOut,
 		event.Success,
 		event.ErrorMessage,
 		source,
-	}}, source
+	}}, source, detailsJSONOut
 }
 
 // emitAuditStructuredLog mirrors the event to the structured logger for
-// real-time monitoring (always immediate, independent of the DB write).
-func emitAuditStructuredLog(event AuditEvent, source string) {
+// real-time monitoring (always immediate, independent of the DB write). The
+// details attribute carries the same redacted, size-bounded payload that is
+// persisted, so a failed event is diagnosable from the live log alone.
+func emitAuditStructuredLog(event AuditEvent, source string, detailsJSON *string) {
 	attrs := []any{
 		"source", source,
 		"username", event.Username,
@@ -301,11 +306,23 @@ func emitAuditStructuredLog(event AuditEvent, source string) {
 	if event.ErrorMessage != "" {
 		attrs = append(attrs, "error_message", event.ErrorMessage)
 	}
+	if detailsJSON != nil && *detailsJSON != "" {
+		if len(*detailsJSON) <= auditStructuredDetailsMaxBytes {
+			attrs = append(attrs, "details", *detailsJSON)
+		} else {
+			attrs = append(attrs, "details", auditDetailsTruncatedValue)
+		}
+	}
 	slog.Info("audit_event", attrs...)
 }
 
 func sanitizeAuditDetails(v any) any {
 	switch x := v.(type) {
+	case nil, string, bool,
+		int, int8, int16, int32, int64,
+		uint, uint8, uint16, uint32, uint64,
+		float32, float64, json.Number:
+		return v
 	case map[string]any:
 		out := make(map[string]any, len(x))
 		for k, val := range x {
@@ -339,8 +356,25 @@ func sanitizeAuditDetails(v any) any {
 		}
 		return out
 	default:
+		return sanitizeAuditJSONValue(x)
+	}
+}
+
+// sanitizeAuditJSONValue redacts typed containers (structs, typed slices and
+// maps) that the direct type switch cannot traverse. It round-trips through
+// JSON so struct tags and exported-field names drive the redaction keys, then
+// sanitizes the generic result. Without this a value such as
+// `[]models.KnowledgeBasePageSource` would be marshaled unredacted.
+func sanitizeAuditJSONValue(v any) any {
+	raw, err := json.Marshal(v)
+	if err != nil {
 		return v
 	}
+	var decoded any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		return v
+	}
+	return sanitizeAuditDetails(decoded)
 }
 
 // isBooleanAuditValue reports whether a value is a bool. A sensitive-looking
@@ -583,6 +617,10 @@ const (
 	ActionAPITokenCleanup     = "api_token.cleanup_expired"
 	ActionAPITokenAutoRevoke  = "api_token.auto_revoke" //nolint:gosec // audit action name, not a credential
 
+	// OAuth authorization decisions
+	ActionOAuthApprove = "oauth.approve"
+	ActionOAuthDeny    = "oauth.deny"
+
 	// OAuth client management
 	ActionOAuthClientCreate       = "oauth_client.create"
 	ActionOAuthClientUpdate       = "oauth_client.update"
@@ -821,7 +859,6 @@ const (
 	// Portal customer (contact) management
 	ActionPortalCustomerCreate      = "portal_customer.create"
 	ActionPortalCustomerUpdate      = "portal_customer.update"
-	ActionPortalCustomerDelete      = "portal_customer.delete"
 	ActionPortalCustomerUpdateOrg   = "portal_customer.update_organisation" //nolint:misspell // British spelling
 	ActionPortalCustomerErase       = "portal_customer.erase"
 	ActionPortalCustomerDataExport  = "portal_customer.data_export"
@@ -992,6 +1029,94 @@ const (
 
 	// Public form administration
 	ActionRequestTypeConfigUpdate = "request_type_config.update"
+
+	// Asset report management
+	ActionAssetReportCreate           = "asset_report.create"
+	ActionAssetReportUpdate           = "asset_report.update"
+	ActionAssetReportDelete           = "asset_report.delete"
+	ActionAssetReportVisibilityUpdate = "asset_report.visibility_update"
+	ActionAssetReportFieldsUpdate     = "asset_report.fields_update"
+
+	// Request type management (public intake forms)
+	ActionRequestTypeCreate           = "request_type.create"
+	ActionRequestTypeUpdate           = "request_type.update"
+	ActionRequestTypeDelete           = "request_type.delete"
+	ActionRequestTypeFieldsUpdate     = "request_type.fields_update"
+	ActionRequestTypeVisibilityUpdate = "request_type.visibility_update"
+
+	// Channel intake management
+	ActionChannelIntakeCreate = "channel_intake.create"
+	ActionChannelIntakeUpdate = "channel_intake.update"
+	ActionChannelIntakeDelete = "channel_intake.delete"
+
+	// Workspace agent bindings and runner registration
+	ActionAgentProfileCreate          = "agent_profile.create"
+	ActionAgentProfileUpdate          = "agent_profile.update"
+	ActionAgentProfileMigrateRunner   = "agent_profile.migrate_runner"
+	ActionAgentProfileConnectRunner   = "agent_profile.connect_runner"
+	ActionAgentProfileTest            = "agent_profile.test"
+	ActionAgentProfileReady           = "agent_profile.ready"
+	ActionAgentRunnerSetupTokenMint   = "agent_runner_setup.token_mint"
+	ActionAgentRunnerSetupTokenRevoke = "agent_runner_setup.token_revoke"
+	ActionAgentBindingCreate          = "agent_binding.create"
+	ActionAgentBindingUpdate          = "agent_binding.update"
+	ActionAgentBindingUpdateConfig    = "agent_binding.update_config"
+	ActionAgentBindingArchive         = "agent_binding.archive"
+	ActionAgentBindingRestore         = "agent_binding.restore"
+	ActionAgentBindingTestRun         = "agent_binding.test_run"
+	ActionAgentSkillCreate            = "agent_skill.create"
+	ActionAgentSkillUpdate            = "agent_skill.update"
+	ActionAgentSkillDelete            = "agent_skill.delete"
+
+	// Agent security administration
+	ActionAgentSecurityFlagSet         = "agent_security.flag.set"
+	ActionAgentSecurityAllowlistAdd    = "agent_security.allowlist.add"
+	ActionAgentSecurityAllowlistRemove = "agent_security.allowlist.remove"
+
+	// Agent template catalog administration
+	ActionAgentTemplateCatalogCreate = "agent_template_catalog.create"
+	ActionAgentTemplateCatalogUpdate = "agent_template_catalog.update"
+	ActionAgentTemplateCatalogDelete = "agent_template_catalog.delete"
+
+	// CLI onboarding
+	ActionCLIOnboardingApprove = "cli_onboarding.approve"
+	ActionCLIOnboardingDeny    = "cli_onboarding.deny"
+
+	// LDAP synchronization
+	ActionLDAPSync = "ldap.sync"
+
+	// Catalog priority management
+	ActionPriorityCreate = "priority.create"
+	ActionPriorityUpdate = "priority.update"
+	ActionPriorityDelete = "priority.delete"
+
+	// Bulk import
+	ActionAssetImport  = "asset_import"
+	ActionTicketImport = "ticket_import"
+
+	// SLA configuration management
+	ActionSLACalendarCreate         = "sla_calendar.create"
+	ActionSLACalendarUpdate         = "sla_calendar.update"
+	ActionSLACalendarDelete         = "sla_calendar.delete"
+	ActionSLAWarningThresholdCreate = "sla_warning_threshold.create"
+	ActionSLAWarningThresholdUpdate = "sla_warning_threshold.update"
+	ActionSLAWarningThresholdDelete = "sla_warning_threshold.delete"
+	ActionSLAMetricCreate           = "sla_metric.create"
+	ActionSLAMetricUpdate           = "sla_metric.update"
+	ActionSLAMetricDelete           = "sla_metric.delete"
+	ActionSLATeamBindingCreate      = "sla_team_binding.create"
+	ActionSLATeamBindingDelete      = "sla_team_binding.delete"
+
+	// Object translation administration
+	ActionObjectTranslationUpdate = "object_translation.update"
+	ActionObjectTranslationDelete = "object_translation.delete"
+
+	// User avatar
+	ActionUserAvatarUpdate = "user.avatar_update"
+
+	// Audit log access (reads and SIEM streaming are security-relevant)
+	ActionAuditLogRead   = "audit_log.read"
+	ActionAuditLogStream = "audit_log.stream"
 )
 
 // Resource type constants
@@ -1094,4 +1219,32 @@ const (
 	ResourceBoardConfiguration   = "board_configuration"
 	ResourceWebhook              = "webhook"
 	ResourceRequestTypeConfig    = "request_type_config"
+	ResourceAssetReport          = "asset_report"
+	ResourceChannelIntake        = "channel_intake"
+
+	// Workspace agent binding and runner registration resources
+	ResourceWorkspaceAgentBinding   = "workspace_agent_binding"
+	ResourceRunnerRegistrationToken = "runner_registration_token"
+	ResourceAgentSkill              = "workspace_agent_skill"
+	ResourceAgentSecurityFlag       = "agent_security_flag"
+	ResourceAgentSecurityAllowlist  = "agent_security_allowlist"
+	ResourceAgentTemplateCatalog    = "agent_template_catalog"
+
+	// Catalog priority resource
+	ResourcePriority = "priority"
+
+	// Bulk import resources
+	ResourceAssetImport = "asset_import"
+
+	// SLA configuration resources
+	ResourceSLACalendar         = "sla_calendar"
+	ResourceSLAWarningThreshold = "sla_warning_threshold"
+	ResourceSLAMetric           = "sla_metric"
+	ResourceSLATeamBinding      = "sla_team_binding"
+
+	// Object translation administration
+	ResourceObjectTranslation = "object_translation"
+
+	// Audit log read surface
+	ResourceAuditLog = "audit_log"
 )

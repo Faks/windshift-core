@@ -128,7 +128,7 @@ func createAdminGroup(deps Deps) jsonOperation[adminGroupCreateRequest, adminGro
 			return adminGroupDTO{}, adminGroupError(err)
 		}
 		groupID := result.Group.ID
-		deps.AdminAuditor.Log(r, user, logger.ActionGroupCreate, logger.ResourceGroup, &groupID, result.Group.Name)
+		logger.Record(r, logger.ActionGroupCreate, logger.ResourceGroup, &groupID, result.Group.Name, nil)
 		return adminGroupFromModel(result.Group, result.Warnings), nil
 	}
 }
@@ -161,15 +161,14 @@ func updateAdminGroup(deps Deps) jsonOperation[adminGroupPatchRequest, adminGrou
 		if err != nil {
 			return adminGroupDTO{}, adminGroupError(err)
 		}
-		auditAdminGroupUpdate(r, actor, deps, before, group)
+		auditAdminGroupUpdate(r, before, group)
 		return adminGroupFromModel(group, result.Warnings), nil
 	}
 }
 
 func deleteAdminGroup(deps Deps) commandOperation {
 	return func(r *http.Request) error {
-		actor, err := requireSystemAdmin(r, deps)
-		if err != nil {
+		if _, err := requireSystemAdmin(r, deps); err != nil {
 			return err
 		}
 		groupID, err := pathID(r, "group_id")
@@ -180,14 +179,14 @@ func deleteAdminGroup(deps Deps) commandOperation {
 		if err != nil {
 			return adminGroupError(err)
 		}
-		deps.AdminAuditor.Log(r, actor, logger.ActionGroupDelete, logger.ResourceGroup, &groupID, snapshot.Name)
+		logger.Record(r, logger.ActionGroupDelete, logger.ResourceGroup, &groupID, snapshot.Name, nil)
 		return nil
 	}
 }
 
 // auditAdminGroupUpdate records field changes and, separately, each group
 // membership addition and removal so the two can be filtered independently.
-func auditAdminGroupUpdate(r *http.Request, actor *models.User, deps Deps, before, after *models.TeamGroup) {
+func auditAdminGroupUpdate(r *http.Request, before, after *models.TeamGroup) {
 	groupID := after.ID
 	details := map[string]any{}
 	if before.Name != after.Name {
@@ -200,7 +199,7 @@ func auditAdminGroupUpdate(r *http.Request, actor *models.User, deps Deps, befor
 		details["is_active"] = map[string]any{"old": before.IsActive, "new": after.IsActive}
 	}
 	if len(details) > 0 {
-		deps.AdminAuditor.LogWithDetails(r, actor, logger.ActionGroupUpdate, logger.ResourceGroup, &groupID, after.Name, details)
+		logger.Record(r, logger.ActionGroupUpdate, logger.ResourceGroup, &groupID, after.Name, details)
 	}
 
 	beforeIDs := groupMemberIDSet(before)
@@ -210,14 +209,14 @@ func auditAdminGroupUpdate(r *http.Request, actor *models.User, deps Deps, befor
 			continue
 		}
 		memberID := id
-		deps.AdminAuditor.LogWithDetails(r, actor, logger.ActionGroupAddMember, logger.ResourceGroup, &groupID, after.Name, map[string]any{"user_id": memberID})
+		logger.Record(r, logger.ActionGroupAddMember, logger.ResourceGroup, &groupID, after.Name, map[string]any{"user_id": memberID})
 	}
 	for _, id := range sortedGroupMemberIDs(beforeIDs) {
 		if _, ok := afterIDs[id]; ok {
 			continue
 		}
 		memberID := id
-		deps.AdminAuditor.LogWithDetails(r, actor, logger.ActionGroupRemoveMember, logger.ResourceGroup, &groupID, after.Name, map[string]any{"user_id": memberID})
+		logger.Record(r, logger.ActionGroupRemoveMember, logger.ResourceGroup, &groupID, after.Name, map[string]any{"user_id": memberID})
 	}
 }
 
@@ -305,7 +304,7 @@ func updateAdminUser(deps Deps) jsonOperation[adminUserPatchRequest, adminUserDT
 		if err != nil {
 			return adminUserDTO{}, adminUserError(err)
 		}
-		auditAdminUserUpdate(r, actor, deps, result)
+		auditAdminUserUpdate(r, result)
 		return adminUserFromModel(deps.AdminUsers, result.User)
 	}
 }
@@ -313,7 +312,7 @@ func updateAdminUser(deps Deps) jsonOperation[adminUserPatchRequest, adminUserDT
 // auditAdminUserUpdate records profile field changes and, separately, an
 // activation or deactivation so the latter cannot be hidden inside a generic
 // profile edit.
-func auditAdminUserUpdate(r *http.Request, actor *models.User, deps Deps, result *services.AdminUserUpdateResult) {
+func auditAdminUserUpdate(r *http.Request, result *services.AdminUserUpdateResult) {
 	before, after := result.Before, result.User
 	details := map[string]any{}
 	if before.Email != after.Email {
@@ -340,14 +339,14 @@ func auditAdminUserUpdate(r *http.Request, actor *models.User, deps Deps, result
 
 	userID := after.ID
 	if len(details) > 0 {
-		deps.AdminAuditor.LogWithDetails(r, actor, logger.ActionUserUpdate, logger.ResourceUser, &userID, after.Username, details)
+		logger.Record(r, logger.ActionUserUpdate, logger.ResourceUser, &userID, after.Username, details)
 	}
 	if before.IsActive != after.IsActive {
 		action := logger.ActionUserActivate
 		if !after.IsActive {
 			action = logger.ActionUserDeactivate
 		}
-		deps.AdminAuditor.LogWithDetails(r, actor, action, logger.ResourceUser, &userID, after.Username, map[string]any{
+		logger.Record(r, action, logger.ResourceUser, &userID, after.Username, map[string]any{
 			"previous_state": before.IsActive,
 			"new_state":      after.IsActive,
 		})
@@ -364,8 +363,8 @@ func requireSystemAdmin(r *http.Request, deps Deps) (*models.User, error) {
 		return nil, internalError(err)
 	}
 	if !allowed {
-		if deps.AdminAuditor != nil && utils.IsMutationMethod(r.Method) {
-			deps.AdminAuditor.LogDenied(r, user, logger.ActionAccessDenied, logger.ResourceRoute, nil, r.URL.Path, models.PermissionSystemAdmin, map[string]any{
+		if utils.IsMutationMethod(r.Method) {
+			logger.RecordDenied(r, logger.ActionAccessDenied, logger.ResourceRoute, nil, r.URL.Path, models.PermissionSystemAdmin, map[string]any{
 				"auth_method": "session",
 			})
 		}

@@ -147,8 +147,8 @@ func (s *SyncService) SyncUsers(ctx context.Context, config *models.LDAPConfig) 
 	_ = logger.LogAudit(s.db, logger.AuditEvent{
 		Username:     "system:ldap",
 		Source:       logger.AuditSourceSystem,
-		ActionType:   "ldap.sync",
-		ResourceType: "ldap_config",
+		ActionType:   logger.ActionLDAPSync,
+		ResourceType: logger.ResourceLDAPConfig,
 		ResourceName: config.Name,
 		Details: map[string]any{
 			"config_id":   config.ID,
