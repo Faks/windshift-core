@@ -101482,8 +101482,9 @@
         "tags": [
           "Work items"
         ],
-        "x-required-scopes": [
-          "items:read"
+        "x-required-any-scopes": [
+          "items:read",
+          "pages:read"
         ]
       }
     },
@@ -101539,8 +101540,9 @@
         "tags": [
           "Work items"
         ],
-        "x-required-scopes": [
-          "items:read"
+        "x-required-any-scopes": [
+          "items:read",
+          "pages:read"
         ]
       }
     },
@@ -101596,8 +101598,9 @@
         "tags": [
           "Work items"
         ],
-        "x-required-scopes": [
-          "items:read"
+        "x-required-any-scopes": [
+          "items:read",
+          "pages:read"
         ]
       }
     },
