@@ -14,6 +14,7 @@ import (
 	"windshift/internal/cql"
 	"windshift/internal/database"
 	"windshift/internal/models"
+	"windshift/internal/search"
 )
 
 // dbTimeLayouts are the datetime string layouts SQLite may emit when a value
@@ -789,9 +790,9 @@ func (r *ItemRepository) buildWhereClause(params ItemListParams) (whereClause st
 	}
 
 	if params.Filters.TextQuery != "" {
-		whereClause += " AND (LOWER(i.title) LIKE LOWER(?) OR LOWER(i.description) LIKE LOWER(?))"
-		searchPattern := "%" + params.Filters.TextQuery + "%"
-		args = append(args, searchPattern, searchPattern)
+		predicate, predicateArgs := r.itemTextSearchPredicate(params.Filters.TextQuery)
+		whereClause += " AND " + predicate
+		args = append(args, predicateArgs...)
 	}
 
 	if params.Filters.ItemKeyQuery != "" {
@@ -800,9 +801,10 @@ func (r *ItemRepository) buildWhereClause(params ItemListParams) (whereClause st
 				// A multi-segment prefix is ambiguous with prose: queries like
 				// "release-2026-09-18" end in digits but are usually text
 				// (WI-1417). Match the key OR the full query as text.
-				whereClause += " AND ((LOWER(w.key) = LOWER(?) AND i.workspace_item_number = ?) OR (LOWER(i.title) LIKE LOWER(?) OR LOWER(i.description) LIKE LOWER(?)))"
-				pattern := "%" + params.Filters.ItemKeyQuery + "%"
-				args = append(args, keyPart, num, pattern, pattern)
+				predicate, predicateArgs := r.itemTextSearchPredicate(params.Filters.ItemKeyQuery)
+				whereClause += " AND ((LOWER(w.key) = LOWER(?) AND i.workspace_item_number = ?) OR " + predicate + ")"
+				args = append(args, keyPart, num)
+				args = append(args, predicateArgs...)
 			} else {
 				whereClause += " AND (LOWER(w.key) = LOWER(?) AND i.workspace_item_number = ?)"
 				args = append(args, keyPart, num)
@@ -813,11 +815,11 @@ func (r *ItemRepository) buildWhereClause(params ItemListParams) (whereClause st
 	// Smart search is additive: text matches keep working, and a query that
 	// resolves to a full item key also matches that item wherever it sits.
 	if params.Filters.SearchQuery != "" {
-		pattern := "%" + params.Filters.SearchQuery + "%"
-		clause := "(LOWER(i.title) LIKE LOWER(?) OR LOWER(i.description) LIKE LOWER(?))"
-		args = append(args, pattern, pattern)
+		predicate, predicateArgs := r.itemTextSearchPredicate(params.Filters.SearchQuery)
+		args = append(args, predicateArgs...)
+		clause := predicate
 		if keyPart, num, ok := splitItemKeyQuery(params.Filters.SearchQuery); ok {
-			clause = "(LOWER(i.title) LIKE LOWER(?) OR LOWER(i.description) LIKE LOWER(?) OR (LOWER(w.key) = LOWER(?) AND i.workspace_item_number = ?))"
+			clause = "(" + predicate + " OR (LOWER(w.key) = LOWER(?) AND i.workspace_item_number = ?))"
 			args = append(args, keyPart, num)
 		}
 		whereClause += " AND " + clause
@@ -829,6 +831,42 @@ func (r *ItemRepository) buildWhereClause(params ItemListParams) (whereClause st
 	}
 
 	return whereClause, args
+}
+
+// itemTextSearchPredicate builds the WHERE predicate for a free-text item
+// search. It uses the token-prefix FTS path when the query has usable terms and
+// falls back to the original unindexed LIKE scan for too-short queries, scripts
+// the tokenizer cannot segment, and key-shaped queries.
+func (r *ItemRepository) itemTextSearchPredicate(raw string) (predicate string, args []any) {
+	tokens := search.Tokens(raw)
+	if len(tokens) == 0 || keyShapedQuery(raw) {
+		pattern := "%" + raw + "%"
+		return "(LOWER(i.title) LIKE LOWER(?) OR LOWER(i.description) LIKE LOWER(?))", []any{pattern, pattern}
+	}
+	if database.IsPostgresDriver(r.db.GetDriverName()) {
+		// The tsvector expression must match idx_items_search verbatim.
+		return "to_tsvector('simple', regexp_replace(ws_unaccent(COALESCE(i.title,'') || ' ' || COALESCE(i.description,'')), '[[:space:][:punct:]]+', ' ', 'g')) @@ to_tsquery('simple', ws_unaccent(?))",
+			[]any{search.PostgresTSQuery(tokens)}
+	}
+	return "i.id IN (SELECT rowid FROM items_fts WHERE items_fts MATCH ?)", []any{search.SQLiteMatch(tokens)}
+}
+
+// keyShapedQuery reports whether raw ends in a dash-number segment such as
+// "CR-4" or "release-2026-09-18". The tokenizer drops the short numeric term,
+// which would broaden the match to every item sharing the leading word, so
+// these stay on the LIKE path (WI-1417).
+func keyShapedQuery(raw string) bool {
+	raw = strings.TrimSpace(raw)
+	lastDash := strings.LastIndex(raw, "-")
+	if lastDash < 0 || lastDash == len(raw)-1 {
+		return false
+	}
+	for _, r := range raw[lastDash+1:] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // QueueCountQuery is one compiled QL fragment to count in a batched call.

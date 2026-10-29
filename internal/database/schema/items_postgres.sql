@@ -292,3 +292,32 @@ CREATE TABLE IF NOT EXISTS item_due_reminders (
 );
 
 CREATE INDEX IF NOT EXISTS idx_item_due_reminders_item ON item_due_reminders(item_id);
+
+-- Token-prefix item search (WI-413). unaccent is applied when the extension is
+-- available; otherwise ws_unaccent degrades to lowercasing so the index and the
+-- query predicate keep the same expression. Punctuation is collapsed to spaces
+-- because the default parser keeps hyphenated numbers and dotted versions as
+-- single tokens. The migration 20261116_item_search_prefix creates the same
+-- objects on existing databases.
+DO $ws_search$
+BEGIN
+	BEGIN
+		CREATE EXTENSION IF NOT EXISTS unaccent;
+	EXCEPTION WHEN OTHERS THEN
+		NULL;
+	END;
+	IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'unaccent') THEN
+		CREATE OR REPLACE FUNCTION ws_unaccent(text) RETURNS text
+			LANGUAGE sql IMMUTABLE PARALLEL SAFE AS
+			$fn$ SELECT lower(unaccent('unaccent', $1)) $fn$;
+	ELSE
+		CREATE OR REPLACE FUNCTION ws_unaccent(text) RETURNS text
+			LANGUAGE sql IMMUTABLE PARALLEL SAFE AS
+			$fn$ SELECT lower($1) $fn$;
+	END IF;
+END
+$ws_search$;
+
+CREATE INDEX IF NOT EXISTS idx_items_search ON items USING GIN (
+	to_tsvector('simple', regexp_replace(ws_unaccent(coalesce(title, '') || ' ' || coalesce(description, '')), '[[:space:][:punct:]]+', ' ', 'g'))
+);

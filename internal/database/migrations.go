@@ -3043,6 +3043,117 @@ var Catalog = []Migration{
 			DROP TABLE IF EXISTS personal_labels;
 		`,
 	},
+	{
+		Version: "20261116_item_search_prefix",
+		Name:    "Index item title/description search with token-prefix FTS (WI-413)",
+		// Ready only when the FTS table and all three sync triggers exist, so a
+		// partially applied migration is retried rather than stamped.
+		CheckSQLite: "SELECT CASE WHEN (SELECT COUNT(*) FROM sqlite_master WHERE name IN ('items_fts', 'items_fts_ai', 'items_fts_ad', 'items_fts_au')) = 4 THEN 1 ELSE 0 END",
+		// Ready only for a valid index; an invalid one is a failed
+		// CREATE INDEX CONCURRENTLY leftover and must be rebuilt.
+		CheckPostgres: "SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relname = 'idx_items_search' AND n.nspname = current_schema() AND i.indisvalid) THEN 1 ELSE 0 END",
+		SQLite:        "applyItemSearchFTS:v1",
+		Postgres:      "applyItemSearchIndexPostgres:v1",
+		ApplySQLite:   applyItemSearchFTS,
+		ApplyPostgres: applyItemSearchIndexPostgres,
+	},
+}
+
+// itemSearchIndexName is the PostgreSQL GIN index backing token-prefix item
+// search. The index and the query must use the identical expression.
+const itemSearchIndexName = "idx_items_search"
+
+// itemSearchExpression is the exact text expression the PostgreSQL GIN index
+// indexes. itemTextSearchPredicate in the repository reproduces it verbatim so
+// the planner can use the index. Punctuation is collapsed to spaces because the
+// default parser keeps hyphenated numbers ("2026-09-18") and dotted versions
+// ("v1.2.3") as single tokens, which would not match the per-word terms the
+// query builder emits.
+const itemSearchExpression = `regexp_replace(ws_unaccent(coalesce(title,'') || ' ' || coalesce(description,'')), '[[:space:][:punct:]]+', ' ', 'g')`
+
+// applyItemSearchFTS creates the SQLite FTS5 index over item title and
+// description and rebuilds it from existing rows. External-content FTS keeps
+// only the inverted index; the triggers keep it in sync with items.
+func applyItemSearchFTS(db Database) error {
+	statements := []string{
+		`CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
+			title, description,
+			content='items', content_rowid='id',
+			tokenize='unicode61'
+		)`,
+		`CREATE TRIGGER IF NOT EXISTS items_fts_ai AFTER INSERT ON items BEGIN
+			INSERT INTO items_fts(rowid, title, description)
+			VALUES (new.id, new.title, new.description);
+		END`,
+		`CREATE TRIGGER IF NOT EXISTS items_fts_ad AFTER DELETE ON items BEGIN
+			INSERT INTO items_fts(items_fts, rowid, title, description)
+			VALUES ('delete', old.id, old.title, old.description);
+		END`,
+		// Only reindex when the indexed columns change; item updates touch
+		// last_active_at and other columns far more often than the text.
+		`CREATE TRIGGER IF NOT EXISTS items_fts_au AFTER UPDATE OF title, description ON items BEGIN
+			INSERT INTO items_fts(items_fts, rowid, title, description)
+			VALUES ('delete', old.id, old.title, old.description);
+			INSERT INTO items_fts(rowid, title, description)
+			VALUES (new.id, new.title, new.description);
+		END`,
+	}
+	for _, statement := range statements {
+		if _, err := db.Exec(statement); err != nil {
+			return fmt.Errorf("item search FTS ddl: %w", err)
+		}
+	}
+	// Idempotent: rebuilds the whole index from the content table, so a retry
+	// after a partial failure (or a large upgrade) converges on the same state.
+	if _, err := db.Exec(`INSERT INTO items_fts(items_fts) VALUES ('rebuild')`); err != nil {
+		return fmt.Errorf("rebuild item search FTS index: %w", err)
+	}
+	return nil
+}
+
+// applyItemSearchIndexPostgres builds the GIN index over item title and
+// description. It is created concurrently so a large items table is not locked
+// for the duration of the build. Accent folding is enabled when the unaccent
+// extension is installable; otherwise the same immutable wrapper degrades to
+// lowercasing only, keeping the index and query expressions identical.
+func applyItemSearchIndexPostgres(db Database) error {
+	body := "lower($1)"
+	if _, err := db.Exec(`CREATE EXTENSION IF NOT EXISTS unaccent`); err != nil {
+		slog.Warn("unaccent extension unavailable; item search will not fold accents",
+			slog.String("component", "database"), slog.Any("error", err))
+	} else {
+		body = "lower(unaccent('unaccent', $1))"
+	}
+	if _, err := db.Exec(`CREATE OR REPLACE FUNCTION ws_unaccent(text) RETURNS text
+		LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$ SELECT ` + body + ` $$`); err != nil {
+		return fmt.Errorf("create ws_unaccent: %w", err)
+	}
+
+	// Drop an invalid leftover from a previously failed concurrent build;
+	// CREATE INDEX CONCURRENTLY IF NOT EXISTS would otherwise keep it.
+	var invalid int
+	if err := db.QueryRow(`
+		SELECT COUNT(*) FROM pg_index i
+		JOIN pg_class c ON c.oid = i.indexrelid
+		JOIN pg_namespace n ON n.oid = c.relnamespace
+		WHERE c.relname = ? AND n.nspname = current_schema() AND NOT i.indisvalid
+	`, itemSearchIndexName).Scan(&invalid); err != nil {
+		return fmt.Errorf("check item search index: %w", err)
+	}
+	if invalid > 0 {
+		if _, err := db.Exec(`DROP INDEX IF EXISTS ` + itemSearchIndexName); err != nil {
+			return fmt.Errorf("drop invalid item search index: %w", err)
+		}
+	}
+
+	indexSQL := fmt.Sprintf(
+		`CREATE INDEX CONCURRENTLY IF NOT EXISTS %s ON items USING gin (to_tsvector('simple', %s))`,
+		itemSearchIndexName, itemSearchExpression,
+	)
+	if _, err := db.Exec(indexSQL); err != nil {
+		return fmt.Errorf("create item search index: %w", err)
+	}
+	return nil
 }
 
 // applyAssetReportsWorkspacePinned backfills form-mode asset reports that have

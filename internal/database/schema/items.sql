@@ -271,4 +271,32 @@ CREATE TABLE IF NOT EXISTS item_due_reminders (
 
 CREATE INDEX IF NOT EXISTS idx_item_due_reminders_item ON item_due_reminders(item_id);
 
+-- Token-prefix item search (WI-413). External-content FTS5 keeps only the
+-- inverted index; the triggers keep it in sync with items. The migration
+-- 20261116_item_search_prefix creates the same objects on existing databases.
+CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
+	title, description,
+	content='items', content_rowid='id',
+	tokenize='unicode61'
+);
+
+CREATE TRIGGER IF NOT EXISTS items_fts_ai AFTER INSERT ON items BEGIN
+	INSERT INTO items_fts(rowid, title, description)
+	VALUES (new.id, new.title, new.description);
+END;
+
+CREATE TRIGGER IF NOT EXISTS items_fts_ad AFTER DELETE ON items BEGIN
+	INSERT INTO items_fts(items_fts, rowid, title, description)
+	VALUES ('delete', old.id, old.title, old.description);
+END;
+
+-- Only reindex when the indexed columns change; item updates touch
+-- last_active_at and other columns far more often than the text.
+CREATE TRIGGER IF NOT EXISTS items_fts_au AFTER UPDATE OF title, description ON items BEGIN
+	INSERT INTO items_fts(items_fts, rowid, title, description)
+	VALUES ('delete', old.id, old.title, old.description);
+	INSERT INTO items_fts(rowid, title, description)
+	VALUES (new.id, new.title, new.description);
+END;
+
 -- migration: 0000_baseline
