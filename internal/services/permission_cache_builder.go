@@ -14,10 +14,9 @@ import (
 )
 
 type permissionCacheBuilder struct {
-	service         *PermissionService
-	userID          int
-	cached          *models.UserPermissionCache
-	rolePermissions map[int]map[string]bool
+	service *PermissionService
+	userID  int
+	cached  *models.UserPermissionCache
 }
 
 func newPermissionCacheBuilder(service *PermissionService, userID int) *permissionCacheBuilder {
@@ -28,12 +27,12 @@ func newPermissionCacheBuilder(service *PermissionService, userID int) *permissi
 		cached: &models.UserPermissionCache{
 			UserID: userID, GlobalPermissions: make(map[string]bool),
 			WorkspacePermissions: make(map[int]map[string]bool),
-			WorkspaceEveryone:    make(map[int]map[string]bool), GroupMemberships: make([]int, 0),
-			RoleAssignments: make(map[int][]int), DirectPermissions: make(map[int][]string),
-			PermissionSources: make(map[int]map[string]string),
-			CachedAt:          now, ExpiresAt: now.Add(service.ttl),
+			GroupMemberships:     make([]int, 0),
+			RoleAssignments:      make(map[int][]int), DirectPermissions: make(map[int][]string),
+			PermissionSources:  make(map[int]map[string]string),
+			UsesSharedEveryone: true,
+			CachedAt:           now, ExpiresAt: now.Add(service.ttl),
 		},
-		rolePermissions: make(map[int]map[string]bool),
 	}
 }
 
@@ -73,121 +72,10 @@ func (b *permissionCacheBuilder) loadSystemAdmin() (bool, error) {
 	return hasSystemAdmin, nil
 }
 
-func (b *permissionCacheBuilder) loadEveryonePermissions() error {
-	activeWorkspaces, err := b.service.getWorkspaceActiveMap()
-	if err != nil {
-		return fmt.Errorf("error loading workspace states: %w", err)
-	}
-	roleIDs, err := b.defaultRoleIDs()
-	if err != nil {
-		return err
-	}
-	explicitAssignments, err := b.explicitRoleAssignments()
-	if err != nil {
-		return err
-	}
-	viewerPerms, err := b.permissionsForRole(roleIDs.viewer)
-	if err != nil {
-		return err
-	}
-	editorPerms, err := b.permissionsForRole(roleIDs.editor)
-	if err != nil {
-		return err
-	}
-	testerPerms, err := b.permissionsForRole(roleIDs.tester)
-	if err != nil {
-		return err
-	}
-
-	for workspaceID, active := range activeWorkspaces {
-		if !active {
-			continue
-		}
-		explicit := explicitAssignments[workspaceID]
-		if explicit[roleIDs.viewer] {
-			b.cached.WorkspaceEveryone[workspaceID] = map[string]bool{}
-			continue
-		}
-		permissions := clonePermissionSet(viewerPerms)
-		editorOpen := !explicit[roleIDs.editor]
-		if editorOpen {
-			mergePerms(permissions, editorPerms)
-		}
-		if editorOpen && !explicit[roleIDs.tester] {
-			mergePerms(permissions, testerPerms)
-		}
-		b.cached.WorkspaceEveryone[workspaceID] = permissions
-	}
-	return nil
-}
-
 type defaultWorkspaceRoleIDs struct {
 	viewer int
 	editor int
 	tester int
-}
-
-func (b *permissionCacheBuilder) defaultRoleIDs() (defaultWorkspaceRoleIDs, error) {
-	var ids defaultWorkspaceRoleIDs
-	roles := []struct {
-		key string
-		id  *int
-	}{
-		{key: models.RoleBuiltinViewer, id: &ids.viewer},
-		{key: models.RoleBuiltinEditor, id: &ids.editor},
-		{key: models.RoleBuiltinTester, id: &ids.tester},
-	}
-	for _, role := range roles {
-		if err := b.service.db.QueryRow(
-			"SELECT id FROM workspace_roles WHERE builtin_key = ? LIMIT 1",
-			role.key,
-		).Scan(role.id); err != nil {
-			return ids, fmt.Errorf("resolve built-in workspace role %q: %w", role.key, err)
-		}
-	}
-	return ids, nil
-}
-
-func (b *permissionCacheBuilder) explicitRoleAssignments() (map[int]map[int]bool, error) {
-	assignments := make(map[int]map[int]bool)
-	rows, err := b.service.db.Query(`
-		SELECT DISTINCT workspace_id, role_id FROM user_workspace_roles
-		UNION
-		SELECT DISTINCT workspace_id, role_id FROM group_workspace_roles
-	`)
-	if err != nil {
-		return nil, fmt.Errorf("load explicit role assignments: %w", err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var workspaceID, roleID int
-		if err := rows.Scan(&workspaceID, &roleID); err != nil {
-			return nil, fmt.Errorf("scan explicit role assignment: %w", err)
-		}
-		if assignments[workspaceID] == nil {
-			assignments[workspaceID] = make(map[int]bool)
-		}
-		assignments[workspaceID][roleID] = true
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate explicit role assignments: %w", err)
-	}
-	return assignments, nil
-}
-
-func (b *permissionCacheBuilder) permissionsForRole(roleID int) (map[string]bool, error) {
-	if roleID == 0 {
-		return nil, fmt.Errorf("built-in workspace role has no ID")
-	}
-	if permissions, ok := b.rolePermissions[roleID]; ok {
-		return permissions, nil
-	}
-	permissions, err := b.service.getRolePermissions(roleID)
-	if err != nil {
-		return nil, fmt.Errorf("load permissions for workspace role %d: %w", roleID, err)
-	}
-	b.rolePermissions[roleID] = permissions
-	return permissions, nil
 }
 
 type globalPermissionSource struct {

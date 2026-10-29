@@ -17,6 +17,7 @@ import (
 	"windshift/internal/repository"
 
 	"github.com/allegro/bigcache/v3"
+	"golang.org/x/sync/singleflight"
 )
 
 // PermissionService handles cached permission resolution
@@ -25,6 +26,14 @@ type PermissionService struct {
 	db              database.Database
 	cacheCommitMu   sync.RWMutex
 	cacheGeneration atomic.Uint64
+
+	// everyone holds the user-independent Everyone fallback, shared by every
+	// snapshot. It is rebuilt when an authorization mutation advances
+	// everyoneGeneration.
+	everyone           atomic.Pointer[everyoneTable]
+	everyoneGeneration atomic.Uint64
+	everyoneLoads      singleflight.Group
+
 	workspaceAccess *workspaceAccessCache
 	closeOnce       sync.Once
 	closeErr        error
@@ -118,7 +127,7 @@ func (ps *PermissionService) HasWorkspacePermission(userID, workspaceID int, per
 	if err != nil {
 		return false, err
 	}
-	return workspacePermissionFromSnapshot(cached, workspaceID, permission), nil
+	return ps.workspacePermission(cached, workspaceID, permission), nil
 }
 
 func workspacePermissionFromSnapshot(cached *models.UserPermissionCache, workspaceID int, permission string) bool {
@@ -129,6 +138,28 @@ func workspacePermissionFromSnapshot(cached *models.UserPermissionCache, workspa
 		return true
 	}
 	if everyonePerms := cached.WorkspaceEveryone[workspaceID]; everyonePerms[permission] {
+		return true
+	}
+	return cached.WorkspacePermissions[workspaceID][permission]
+}
+
+// workspacePermission evaluates one workspace permission against a snapshot.
+// A snapshot carrying the legacy WorkspaceEveryone overlay uses it as the
+// authoritative fallback; otherwise the shared Everyone table is consulted.
+// The fallback fails closed when the table cannot be loaded.
+func (ps *PermissionService) workspacePermission(cached *models.UserPermissionCache, workspaceID int, permission string) bool {
+	if cached == nil {
+		return false
+	}
+	// Snapshots that do not opt into the shared table keep the embedded
+	// WorkspaceEveryone overlay as the only fallback source.
+	if !cached.UsesSharedEveryone {
+		return workspacePermissionFromSnapshot(cached, workspaceID, permission)
+	}
+	if cached.IsSystemAdmin {
+		return true
+	}
+	if table, err := ps.ensureEveryoneTable(); err == nil && table.has(workspaceID, permission) {
 		return true
 	}
 	return cached.WorkspacePermissions[workspaceID][permission]
@@ -241,7 +272,7 @@ func (ps *PermissionService) HasWorkspacePermissions(userID, workspaceID int, pe
 	cached, err := ps.getUserPermissionCache(userID)
 	if err == nil {
 		atomic.AddInt64(&ps.hits, 1)
-		return workspacePermissionResults(cached, workspaceID, permissions), nil
+		return ps.workspacePermissionResults(cached, workspaceID, permissions), nil
 	}
 
 	atomic.AddInt64(&ps.misses, 1)
@@ -347,7 +378,7 @@ func (ps *PermissionService) loadUserPermissionAndCheckMultiple(userID, workspac
 		atomic.AddInt64(&ps.errors, 1)
 		return make(map[string]bool), err
 	}
-	return workspacePermissionResults(cached, workspaceID, permissions), nil
+	return ps.workspacePermissionResults(cached, workspaceID, permissions), nil
 }
 
 func workspacePermissionResults(
@@ -366,6 +397,30 @@ func workspacePermissionResults(
 	explicit := cached.WorkspacePermissions[workspaceID]
 	for _, permission := range permissions {
 		result[permission] = everyone[permission] || explicit[permission]
+	}
+	return result
+}
+
+// workspacePermissionResults is the multi-permission form of workspacePermission.
+func (ps *PermissionService) workspacePermissionResults(
+	cached *models.UserPermissionCache,
+	workspaceID int,
+	permissions []string,
+) map[string]bool {
+	if !cached.UsesSharedEveryone {
+		return workspacePermissionResults(cached, workspaceID, permissions)
+	}
+	result := make(map[string]bool)
+	if cached.IsSystemAdmin {
+		for _, permission := range permissions {
+			result[permission] = true
+		}
+		return result
+	}
+	explicit := cached.WorkspacePermissions[workspaceID]
+	table, err := ps.ensureEveryoneTable()
+	for _, permission := range permissions {
+		result[permission] = explicit[permission] || (err == nil && table.has(workspaceID, permission))
 	}
 	return result
 }
@@ -419,6 +474,7 @@ func (ps *PermissionService) invalidateUserCaches(userIDs []int) error {
 	ps.cacheCommitMu.Lock()
 	defer ps.cacheCommitMu.Unlock()
 	ps.cacheGeneration.Add(1)
+	ps.everyoneGeneration.Add(1)
 	var errs []error
 	for _, userID := range userIDs {
 		if err := ps.cache.Delete(ps.getCacheKey(userID)); err != nil && !errors.Is(err, bigcache.ErrEntryNotFound) {
@@ -606,6 +662,7 @@ func (ps *PermissionService) ResetPermissionCache() error {
 	ps.cacheCommitMu.Lock()
 	defer ps.cacheCommitMu.Unlock()
 	ps.cacheGeneration.Add(1)
+	ps.everyoneGeneration.Add(1)
 	return ps.cache.Reset()
 }
 
@@ -764,7 +821,10 @@ func (ps *PermissionService) buildUserPermissionCache(userID int) (*models.UserP
 	if isAdmin {
 		return builder.cached, nil
 	}
-	if err := builder.loadEveryonePermissions(); err != nil {
+	// The Everyone fallback is shared across users. Rebuild it here so a workspace
+	// or role assignment written since the last build is visible, and so an
+	// incomplete load fails the snapshot closed instead of caching a partial one.
+	if _, err := ps.refreshEveryoneTable(); err != nil {
 		return nil, err
 	}
 	if err := builder.loadGlobalPermissions(); err != nil {
@@ -889,22 +949,6 @@ func scanIntColumn(rows *sql.Rows) ([]int, error) {
 		return nil, err
 	}
 	return ids, nil
-}
-
-func clonePermissionSet(src map[string]bool) map[string]bool {
-	dst := make(map[string]bool, len(src))
-	for k, v := range src {
-		dst[k] = v
-	}
-	return dst
-}
-
-func mergePerms(dst, src map[string]bool) {
-	for k, v := range src {
-		if v {
-			dst[k] = true
-		}
-	}
 }
 
 // WarmCache pre-loads permissions for recently active users
