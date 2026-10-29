@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -864,15 +863,4 @@ func mergeMetadata(base, meta PluginMetadata) PluginMetadata {
 		base.Extensions = meta.Extensions
 	}
 	return base
-}
-
-// ReadPluginFile reads a file from a plugin directory.
-func ReadPluginFile(pluginDir, pluginName, filename string) (io.ReadCloser, error) {
-	baseDir := filepath.Join(pluginDir, pluginName)
-	filePath, err := securejoin.SecureJoin(baseDir, filename)
-	if err != nil {
-		return nil, errors.New("invalid file path")
-	}
-
-	return os.Open(filePath) //nolint:gosec // G304 — filePath sanitized via securejoin.SecureJoin
 }

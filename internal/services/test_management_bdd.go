@@ -32,7 +32,7 @@ func newGherkinDocumentResponse(doc *gherkin.Document, errs *gherkin.ErrorList) 
 // consumption, tests:write for authoring and execution.
 
 // GetCaseDetail returns a case with its BDD content attached when the case
-// is BDD-format. The plain GetCase stays unchanged for step-based cases.
+// is BDD-format.
 func (s *TestManagementApplicationService) GetCaseDetail(userID, workspaceID, id int) (*models.TestCase, error) {
 	if err := s.require(userID, workspaceID, models.PermissionTestView); err != nil {
 		return nil, err
@@ -49,19 +49,6 @@ func (s *TestManagementApplicationService) GetCaseDetail(userID, workspaceID, id
 		testCase.BDD = bdd
 	}
 	return testCase, nil
-}
-
-// UpdateCaseGherkin validates and stores new Gherkin for a BDD case.
-func (s *TestManagementApplicationService) UpdateCaseGherkin(userID, workspaceID, id int, actor AuditActor, source string) (*models.TestCase, error) {
-	if err := s.require(userID, workspaceID, models.PermissionTestManage); err != nil {
-		return nil, err
-	}
-	updated, err := s.cases.UpdateBDDContent(id, workspaceID, source)
-	if err != nil {
-		return nil, err
-	}
-	emitServiceAudit(s.db, actor, logger.ActionTestCaseUpdate, logger.ResourceTestCase, &updated.ID, updated.Title, nil)
-	return updated, nil
 }
 
 // ImportFeatureResult reports the outcome of a feature-file import.

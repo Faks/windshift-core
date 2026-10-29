@@ -146,16 +146,3 @@ func matchRoute(route Route, method, path string) bool {
 
 	return false
 }
-
-// GetPluginRoutes returns all registered plugin routes
-func (r *Router) GetPluginRoutes() map[string][]Route {
-	routes := make(map[string][]Route)
-
-	for _, plugin := range r.manager.ListPlugins() {
-		if plugin.Enabled {
-			routes[plugin.Manifest.Name] = plugin.Routes
-		}
-	}
-
-	return routes
-}

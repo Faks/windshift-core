@@ -153,18 +153,6 @@ func (r *IntakeRepository) ListByPortal(ctx context.Context, portalChannelID int
 	return scanIntakes(rows)
 }
 
-// ListByWorkspace returns the intakes routing into a workspace.
-func (r *IntakeRepository) ListByWorkspace(ctx context.Context, workspaceID int) ([]models.Intake, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT`+intakeSelectColumns+intakeFromJoins+`
-		WHERE i.workspace_id = ?
-		ORDER BY i.folder, i.id`, workspaceID)
-	if err != nil {
-		return nil, fmt.Errorf("list intakes for workspace %d: %w", workspaceID, err)
-	}
-	defer func() { _ = rows.Close() }()
-	return scanIntakes(rows)
-}
-
 func scanIntakes(rows *sql.Rows) ([]models.Intake, error) {
 	var out []models.Intake
 	for rows.Next() {
@@ -293,16 +281,6 @@ func (r *IntakeRepository) DeleteByWorkspaceTx(tx database.Tx, workspaceID int) 
 		`DELETE FROM intakes WHERE workspace_id = ?`, workspaceID,
 	); err != nil {
 		return fmt.Errorf("delete intakes for workspace %d: %w", workspaceID, err)
-	}
-	return nil
-}
-
-// DeleteByPortalTx removes every intake exposing requests to a deleted portal.
-func (r *IntakeRepository) DeleteByPortalTx(tx database.Tx, portalChannelID int) error {
-	if _, err := tx.Exec(
-		`DELETE FROM intakes WHERE portal_channel_id = ?`, portalChannelID,
-	); err != nil {
-		return fmt.Errorf("delete intakes for portal %d: %w", portalChannelID, err)
 	}
 	return nil
 }

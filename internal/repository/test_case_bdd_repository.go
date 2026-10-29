@@ -246,27 +246,6 @@ func scanExampleResult(rows exampleResultScanner) (models.TestExampleResult, err
 	return result, nil
 }
 
-// FindExampleResultByID returns one example result, scoped to the run's
-// workspace.
-func (r *TestCaseBDDRepository) FindExampleResultByID(runID, workspaceID, exampleResultID int) (*models.TestExampleResult, error) {
-	row := r.db.QueryRow(`
-		SELECT er.id, er.run_id, er.test_case_id, er.example_index, er.row_values,
-		       er.status, COALESCE(er.actual_result, ''), COALESCE(er.notes, ''),
-		       er.executed_at, er.created_at, er.updated_at
-		FROM test_example_results er
-		JOIN test_runs run ON run.id = er.run_id
-		WHERE er.id = ? AND er.run_id = ? AND run.workspace_id = ?
-	`, exampleResultID, runID, workspaceID)
-	result, err := scanExampleResult(row)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &result, nil
-}
-
 // FindStepResultsForExample returns the recorded step results of one example
 // execution ordered by step number.
 func (r *TestCaseBDDRepository) FindStepResultsForExample(exampleResultID int) ([]models.TestExampleStepResult, error) {

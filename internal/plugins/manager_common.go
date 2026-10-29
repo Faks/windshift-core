@@ -48,32 +48,6 @@ type LicenseVerifier func(pluginName string, license []byte) error
 // Option configures the ManagerOptions.
 type Option func(*ManagerOptions)
 
-// WithTimeout sets a per-call timeout when invoking plugin exports.
-// deadcode-keep: called by core-tests/tests/helpers.go
-func WithTimeout(d time.Duration) Option {
-	return func(o *ManagerOptions) { o.PluginTimeout = d }
-}
-
-// WithMemoryLimit sets a soft memory ceiling in bytes (converted to wasm pages).
-func WithMemoryLimit(memoryBytes uint64) Option {
-	return func(o *ManagerOptions) { o.MemoryLimit = memoryBytes }
-}
-
-// WithHTTPClient overrides the HTTP client used by the http_fetch host function.
-func WithHTTPClient(c *http.Client) Option {
-	return func(o *ManagerOptions) { o.HTTPClient = c }
-}
-
-// WithSMTPSender wires a concrete SMTP sender for smtp_send host calls.
-func WithSMTPSender(s SMTPSender) Option {
-	return func(o *ManagerOptions) { o.SMTPSender = s }
-}
-
-// WithLogger overrides the logger used by the manager and host functions.
-func WithLogger(l *slog.Logger) Option {
-	return func(o *ManagerOptions) { o.Logger = l }
-}
-
 // WithDatabase sets the database for plugin host functions (KV store, create_comment, etc.).
 func WithDatabase(db database.Database) Option {
 	return func(o *ManagerOptions) { o.Database = db }

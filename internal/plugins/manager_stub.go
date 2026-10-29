@@ -4,7 +4,6 @@ package plugins
 
 import (
 	"errors"
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -137,15 +136,4 @@ func (m *Manager) GetCapabilities() []string { return nil }
 
 func (m *Manager) GetExtensions() map[string][]Extension {
 	return make(map[string][]Extension)
-}
-
-// ReadPluginFile reads a file from a plugin directory.
-func ReadPluginFile(pluginDir, pluginName, filename string) (io.ReadCloser, error) {
-	filePath := filepath.Join(pluginDir, pluginName, filename)
-
-	if !strings.HasPrefix(filePath, filepath.Join(pluginDir, pluginName)) {
-		return nil, errors.New("invalid file path")
-	}
-
-	return os.Open(filePath)
 }

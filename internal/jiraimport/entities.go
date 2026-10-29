@@ -642,21 +642,6 @@ func (s *Service) ItemLinkExists(linkID int) bool {
 	return s.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM item_links WHERE id = ?)`, linkID).Scan(&exists) == nil && exists
 }
 
-func (s *Service) AttachmentPath() (string, bool) {
-	var attachmentPath string
-	err := s.db.QueryRow(`
-		SELECT attachment_path
-		FROM attachment_settings
-		WHERE enabled = true
-		ORDER BY id DESC
-		LIMIT 1
-	`).Scan(&attachmentPath)
-	if err != nil || strings.TrimSpace(attachmentPath) == "" {
-		return "", false
-	}
-	return attachmentPath, true
-}
-
 func (s *Service) PreserveAttachmentCreatedAt(attachmentID int64, createdAt time.Time) error {
 	return s.attachments.UpdateCreatedAt(attachmentID, createdAt)
 }
