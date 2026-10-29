@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+
+	"github.com/lib/pq"
 )
 
 // pgJSONBColumnsCheck reports whether every named column already has the
@@ -3111,19 +3113,40 @@ func applyItemSearchFTS(db Database) error {
 	return nil
 }
 
+// itemSearchUnaccentBody returns the SQL body of the immutable ws_unaccent
+// wrapper: a schema-qualified unaccent call when the extension is available,
+// otherwise a bare lower(). The extension can already be installed in a schema
+// outside search_path (managed Postgres often keeps extensions in a dedicated
+// schema), where CREATE EXTENSION IF NOT EXISTS is a no-op and the unqualified
+// name does not resolve, so the call is qualified with the extension's actual
+// schema. The single-argument form is used because the two-argument form would
+// additionally need the 'unaccent' text-search dictionary on search_path.
+func itemSearchUnaccentBody(db Database) string {
+	if _, err := db.Exec(`CREATE EXTENSION IF NOT EXISTS unaccent`); err != nil {
+		slog.Warn("unaccent extension unavailable; item search will not fold accents",
+			slog.String("component", "database"), slog.Any("error", err))
+		return "lower($1)"
+	}
+	var schema string
+	if err := db.QueryRow(`
+		SELECT n.nspname FROM pg_extension e
+		JOIN pg_namespace n ON n.oid = e.extnamespace
+		WHERE e.extname = 'unaccent'
+	`).Scan(&schema); err != nil {
+		slog.Warn("unaccent extension schema unresolved; item search will not fold accents",
+			slog.String("component", "database"), slog.Any("error", err))
+		return "lower($1)"
+	}
+	return fmt.Sprintf("lower(%s.unaccent($1))", pq.QuoteIdentifier(schema))
+}
+
 // applyItemSearchIndexPostgres builds the GIN index over item title and
 // description. It is created concurrently so a large items table is not locked
 // for the duration of the build. Accent folding is enabled when the unaccent
 // extension is installable; otherwise the same immutable wrapper degrades to
 // lowercasing only, keeping the index and query expressions identical.
 func applyItemSearchIndexPostgres(db Database) error {
-	body := "lower($1)"
-	if _, err := db.Exec(`CREATE EXTENSION IF NOT EXISTS unaccent`); err != nil {
-		slog.Warn("unaccent extension unavailable; item search will not fold accents",
-			slog.String("component", "database"), slog.Any("error", err))
-	} else {
-		body = "lower(unaccent('unaccent', $1))"
-	}
+	body := itemSearchUnaccentBody(db)
 	if _, err := db.Exec(`CREATE OR REPLACE FUNCTION ws_unaccent(text) RETURNS text
 		LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$ SELECT ` + body + ` $$`); err != nil {
 		return fmt.Errorf("create ws_unaccent: %w", err)
